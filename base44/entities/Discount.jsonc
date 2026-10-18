@@ -1,0 +1,50 @@
+{
+  "name": "Discount",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "percentage",
+        "fixed",
+        "promo",
+        "senior",
+        "pwd",
+        "custom"
+      ],
+      "default": "percentage"
+    },
+    "value": {
+      "type": "number",
+      "default": 0
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "minimum_purchase": {
+      "type": "number",
+      "default": 0
+    },
+    "maximum_discount": {
+      "type": "number",
+      "default": 0
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "value"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "AppSetting",
+  "type": "object",
+  "properties": {
+    "restaurant_name": {
+      "type": "string",
+      "default": "Daddy's Sizzlers"
+    },
+    "logo_url": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "facebook_page": {
+      "type": "string"
+    },
+    "business_hours": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string",
+      "default": "PHP"
+    },
+    "timezone": {
+      "type": "string",
+      "default": "Asia/Manila"
+    }
+  },
+  "required": [
+    "restaurant_name"
+  ]
+}

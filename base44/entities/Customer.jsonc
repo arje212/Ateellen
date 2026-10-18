@@ -1,0 +1,32 @@
+{
+  "name": "Customer",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "total_orders": {
+      "type": "number",
+      "default": 0
+    },
+    "total_spending": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

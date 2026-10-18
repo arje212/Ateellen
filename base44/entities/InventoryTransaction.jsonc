@@ -1,0 +1,41 @@
+{
+  "name": "InventoryTransaction",
+  "type": "object",
+  "properties": {
+    "item_id": {
+      "type": "string"
+    },
+    "item_name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "stock_in",
+        "stock_out",
+        "adjustment",
+        "waste",
+        "transfer"
+      ],
+      "default": "stock_in"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "unit": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "item_name",
+    "type",
+    "quantity"
+  ]
+}

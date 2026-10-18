@@ -1,0 +1,46 @@
+{
+  "name": "Expense",
+  "type": "object",
+  "properties": {
+    "expense_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ingredients",
+        "utilities",
+        "rent",
+        "salaries",
+        "transportation",
+        "supplies",
+        "maintenance",
+        "marketing",
+        "other"
+      ],
+      "default": "other"
+    },
+    "amount": {
+      "type": "number",
+      "default": 0
+    },
+    "description": {
+      "type": "string"
+    },
+    "paid_by": {
+      "type": "string"
+    },
+    "receipt_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "expense_date",
+    "category",
+    "amount"
+  ]
+}

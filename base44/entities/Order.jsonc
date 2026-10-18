@@ -1,0 +1,148 @@
+{
+  "name": "Order",
+  "type": "object",
+  "properties": {
+    "order_number": {
+      "type": "string"
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "dine_in",
+        "takeout",
+        "delivery"
+      ],
+      "default": "dine_in"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "new",
+        "preparing",
+        "ready",
+        "served",
+        "completed",
+        "cancelled"
+      ],
+      "default": "new"
+    },
+    "table_number": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "delivery_address": {
+      "type": "string"
+    },
+    "delivery_notes": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "price",
+          "quantity",
+          "subtotal"
+        ]
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_id": {
+      "type": "string"
+    },
+    "discount_name": {
+      "type": "string"
+    },
+    "discount_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "total": {
+      "type": "number",
+      "default": 0
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "gcash",
+        "maya",
+        "bank_transfer",
+        "other"
+      ],
+      "default": "cash"
+    },
+    "amount_paid": {
+      "type": "number",
+      "default": 0
+    },
+    "change": {
+      "type": "number",
+      "default": 0
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "unpaid",
+        "paid",
+        "refunded"
+      ],
+      "default": "unpaid"
+    },
+    "cashier_id": {
+      "type": "string"
+    },
+    "cashier_name": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "pos",
+        "online"
+      ],
+      "default": "pos"
+    }
+  },
+  "required": [
+    "order_number",
+    "order_type",
+    "total"
+  ]
+}

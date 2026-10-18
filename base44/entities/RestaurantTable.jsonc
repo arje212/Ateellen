@@ -1,0 +1,47 @@
+{
+  "name": "RestaurantTable",
+  "type": "object",
+  "properties": {
+    "table_number": {
+      "type": "string"
+    },
+    "seats": {
+      "type": "number",
+      "default": 4
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "occupied",
+        "reserved",
+        "cleaning"
+      ],
+      "default": "available"
+    },
+    "current_order_id": {
+      "type": "string"
+    },
+    "current_order_number": {
+      "type": "string"
+    },
+    "current_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "time_occupied": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "customers": {
+      "type": "number",
+      "default": 0
+    },
+    "location": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "table_number"
+  ]
+}

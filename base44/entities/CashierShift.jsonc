@@ -1,0 +1,61 @@
+{
+  "name": "CashierShift",
+  "type": "object",
+  "properties": {
+    "cashier_name": {
+      "type": "string"
+    },
+    "opening_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "total_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "total_orders": {
+      "type": "number",
+      "default": 0
+    },
+    "cash_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "digital_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "expected_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "actual_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "difference": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "cashier_name",
+    "opening_cash"
+  ]
+}

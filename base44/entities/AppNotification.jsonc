@@ -1,0 +1,29 @@
+{
+  "name": "AppNotification",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "module": {
+      "type": "string"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false
+    },
+    "related_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "type"
+  ]
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, Pencil, Trash2, Search, Flame, X, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,8 @@ export default function MenuManagement() {
 
   const load = async () => {
     const [p, c] = await Promise.all([
-      base44.entities.Product.filter({}, { sort: "sort_order", limit: 200 }),
-      base44.entities.Category.list({ sort: "sort_order", limit: 50 }),
+      db.entities.Product.filter({}, { sort: "sort_order", limit: 200 }),
+      db.entities.Category.list({ sort: "sort_order", limit: 50 }),
     ]);
     setProducts(p.items || []);
     setCategories(c.items || []);
@@ -34,15 +34,15 @@ export default function MenuManagement() {
   const filtered = products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
   const toggleActive = async (p) => {
-    await base44.entities.Product.update(p.id, { active: !p.active });
-    await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "toggle_product", module: "Menu", description: `${p.name} ${p.active?"deactivated":"activated"}` });
+    await db.entities.Product.update(p.id, { active: !p.active });
+    await db.entities.AuditLog.create({ user_name: user?.full_name, action: "toggle_product", module: "Menu", description: `${p.name} ${p.active?"deactivated":"activated"}` });
     load();
   };
 
   const remove = async (p) => {
     if (!confirm(`Delete ${p.name}?`)) return;
-    await base44.entities.Product.delete(p.id);
-    await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "delete_product", module: "Menu", description: `Deleted ${p.name}` });
+    await db.entities.Product.delete(p.id);
+    await db.entities.AuditLog.create({ user_name: user?.full_name, action: "delete_product", module: "Menu", description: `Deleted ${p.name}` });
     toast({ title: "Product deleted" });
     load();
   };
@@ -116,11 +116,11 @@ function ProductForm({ product, categories, onClose, onSaved }) {
     setSaving(true);
     try {
       if (product) {
-        await base44.entities.Product.update(product.id, payload);
-        await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "update_product", module: "Menu", description: `Updated ${form.name}`, previous_value: `₱${product.price}`, new_value: `₱${form.price}` });
+        await db.entities.Product.update(product.id, payload);
+        await db.entities.AuditLog.create({ user_name: user?.full_name, action: "update_product", module: "Menu", description: `Updated ${form.name}`, previous_value: `₱${product.price}`, new_value: `₱${form.price}` });
       } else {
-        await base44.entities.Product.create(payload);
-        await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "create_product", module: "Menu", description: `Created ${form.name}` });
+        await db.entities.Product.create(payload);
+        await db.entities.AuditLog.create({ user_name: user?.full_name, action: "create_product", module: "Menu", description: `Created ${form.name}` });
       }
       toast({ title: "Saved" });
       onSaved();

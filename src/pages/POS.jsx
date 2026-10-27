@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Search, Plus, Minus, X, Trash2, Flame, Pause, Play, Printer, Wallet, Check, ShoppingCart } from "lucide-react";
 import { Image } from "@/components/ui/image";
@@ -33,10 +33,10 @@ export default function POS() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Category.list({ sort: "sort_order", limit: 50 }),
-      base44.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
-      base44.entities.RestaurantTable.list({ limit: 50 }),
-      base44.entities.Discount.filter({ active: true }, { limit: 50 }),
+      db.entities.Category.list({ sort: "sort_order", limit: 50 }),
+      db.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
+      db.entities.RestaurantTable.list({ limit: 50 }),
+      db.entities.Discount.filter({ active: true }, { limit: 50 }),
     ]).then(([c, p, t, d]) => {
       setCategories(c.items || []);
       setProducts(p.items || []);
@@ -101,10 +101,10 @@ export default function POS() {
     try {
       const today = new Date();
       const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
-      const count = await base44.entities.Order.count({ order_number: { $regex: `ORD-${ymd}` } });
+      const count = await db.rpc("count_orders_with_prefix", { prefix: `ORD-${ymd}` });
       const order_number = generateOrderNumber(count);
       const d = discounts.find(x => x.id === discountId);
-      const order = await base44.entities.Order.create({
+      const order = await db.entities.Order.create({
         order_number,
         order_type: orderType,
         status: "new",
@@ -129,10 +129,10 @@ export default function POS() {
       // occupy table
       if (orderType === "dine_in") {
         const t = tables.find(x => x.table_number === tableNumber);
-        if (t) await base44.entities.RestaurantTable.update(t.id, { status: "occupied", current_order_id: order.id, current_order_number: order_number, current_amount: total, time_occupied: new Date().toISOString(), customers: 1 });
+        if (t) await db.entities.RestaurantTable.update(t.id, { status: "occupied", current_order_id: order.id, current_order_number: order_number, current_amount: total, time_occupied: new Date().toISOString(), customers: 1 });
       }
-      await base44.entities.AppNotification.create({ type: "new_order", title: "New POS order", message: `${order_number} • ${ORDER_TYPES[orderType]}`, module: "kitchen", related_id: order.id });
-      await base44.entities.AuditLog.create({ user_name: user?.full_name || "Cashier", action: "create_order", module: "POS", description: `Created ${order_number} — ${formatPeso(total)}` });
+      await db.entities.AppNotification.create({ type: "new_order", title: "New POS order", message: `${order_number} • ${ORDER_TYPES[orderType]}`, module: "kitchen", related_id: order.id });
+      await db.entities.AuditLog.create({ user_name: user?.full_name || "Cashier", action: "create_order", module: "POS", description: `Created ${order_number} — ${formatPeso(total)}` });
       setLastReceipt(order);
       resetOrder();
       toast({ title: "Payment complete", description: `${order_number} • Change ${formatPeso(change)}` });

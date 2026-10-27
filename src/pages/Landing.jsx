@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { Flame, Leaf, Star, Clock, MapPin, Phone, Facebook, ArrowRight, UtensilsCrossed, Truck, ShieldCheck } from "lucide-react";
 import { foodImage, formatPeso } from "@/lib/restaurant";
 import { MENU_CATEGORIES, MENU_PRODUCTS } from "@/lib/menuData";
@@ -17,9 +17,9 @@ export default function Landing() {
     let active = true;
 
     Promise.allSettled([
-      base44.entities.Category.list({ sort: "sort_order", limit: 50 }).then(r => r.items || []),
-      base44.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 6 }).then(r => r.items || []),
-      base44.entities.AppSetting.list({ limit: 1 }).then(r => (r.items || [])[0]).catch(() => null),
+      db.entities.Category.list({ sort: "sort_order", limit: 50 }).then(r => r.items || []),
+      db.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 6 }).then(r => r.items || []),
+      db.entities.AppSetting.list({ limit: 1 }).then(r => (r.items || [])[0]).catch(() => null),
     ]).then(([categoryResult, productResult, settingsResult]) => {
       if (!active) return;
       if (categoryResult.status === "fulfilled" && categoryResult.value.length) {
@@ -53,7 +53,6 @@ export default function Landing() {
             <a href="#menu" className="hover:text-primary transition-colors">Menu</a>
             <a href="#about" className="hover:text-primary transition-colors">About</a>
             <a href="#contact" className="hover:text-primary transition-colors">Contact</a>
-            <Link to="/admin" className="hover:text-primary transition-colors">Staff Login</Link>
           </nav>
           <Link to="/order" className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-600 px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-opacity">
             Order Now <ArrowRight className="w-4 h-4" />

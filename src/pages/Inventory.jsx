@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, Pencil, Trash2, Search, X, ArrowDownCircle, ArrowUpCircle, AlertTriangle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default function Inventory() {
   const [moving, setMoving] = useState(null);
 
   const load = async () => {
-    const res = await base44.entities.InventoryItem.filter({}, { sort: "name", limit: 200 });
+    const res = await db.entities.InventoryItem.filter({}, { sort: "name", limit: 200 });
     setItems(res.items || []);
     setLoading(false);
   };
@@ -42,7 +42,7 @@ export default function Inventory() {
 
   const remove = async (i) => {
     if (!confirm(`Delete ${i.name}?`)) return;
-    await base44.entities.InventoryItem.delete(i.id);
+    await db.entities.InventoryItem.delete(i.id);
     load();
   };
 
@@ -124,8 +124,8 @@ function ItemForm({ item, onClose, onSaved }) {
     const payload = { ...form, current_stock: Number(form.current_stock), minimum_stock: Number(form.minimum_stock), cost_per_unit: Number(form.cost_per_unit), status: computeStatus(Number(form.current_stock), Number(form.minimum_stock)) };
     setSaving(true);
     try {
-      if (item) await base44.entities.InventoryItem.update(item.id, payload);
-      else await base44.entities.InventoryItem.create(payload);
+      if (item) await db.entities.InventoryItem.update(item.id, payload);
+      else await db.entities.InventoryItem.create(payload);
       toast({ title: "Saved" });
       onSaved();
     } catch (e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
@@ -176,11 +176,11 @@ function StockMovement({ item, onClose, onDone, user }) {
     try {
       const delta = type === "stock_in" ? n : -n;
       const newStock = Math.max(0, item.current_stock + delta);
-      await base44.entities.InventoryItem.update(item.id, { current_stock: newStock, status: computeStatus(newStock, item.minimum_stock) });
-      await base44.entities.InventoryTransaction.create({ item_id: item.id, item_name: item.name, type, quantity: n, unit: item.unit, reason, user_name: user?.full_name });
-      await base44.entities.AuditLog.create({ user_name: user?.full_name, action: type, module: "Inventory", description: `${item.name} ${type} ${n} ${item.unit}`, previous_value: String(item.current_stock), new_value: String(newStock) });
+      await db.entities.InventoryItem.update(item.id, { current_stock: newStock, status: computeStatus(newStock, item.minimum_stock) });
+      await db.entities.InventoryTransaction.create({ item_id: item.id, item_name: item.name, type, quantity: n, unit: item.unit, reason, user_name: user?.full_name });
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: type, module: "Inventory", description: `${item.name} ${type} ${n} ${item.unit}`, previous_value: String(item.current_stock), new_value: String(newStock) });
       if (computeStatus(newStock, item.minimum_stock) !== "in_stock") {
-        await base44.entities.AppNotification.create({ type: "low_stock", title: "Low stock alert", message: `${item.name} at ${newStock} ${item.unit}`, module: "inventory" });
+        await db.entities.AppNotification.create({ type: "low_stock", title: "Low stock alert", message: `${item.name} at ${newStock} ${item.unit}`, module: "inventory" });
       }
       toast({ title: "Stock updated", description: `${item.name}: ${newStock} ${item.unit}` });
       onDone();

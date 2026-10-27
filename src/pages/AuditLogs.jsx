@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { ShieldCheck, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/lib/restaurant";
@@ -10,7 +10,7 @@ export default function AuditLogs() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    base44.entities.AuditLog.filter({}, { sort: "-created_date", limit: 200 }).then(r => { setItems(r.items||[]); setLoading(false); });
+    db.entities.AuditLog.filter({}, { sort: "-created_date", limit: 200 }).then(r => { setItems(r.items||[]); setLoading(false); });
   }, []);
 
   const filtered = items.filter(l => !search || (l.action + l.module + l.description + (l.user_name||"")).toLowerCase().includes(search.toLowerCase()));

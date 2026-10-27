@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, X, Users, Clock, Wallet, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default function Tables() {
   const [showForm, setShowForm] = useState(false);
 
   const load = async () => {
-    const res = await base44.entities.RestaurantTable.filter({}, { sort: "table_number", limit: 100 });
+    const res = await db.entities.RestaurantTable.filter({}, { sort: "table_number", limit: 100 });
     setTables(res.items || []);
     setLoading(false);
   };
@@ -30,14 +30,14 @@ export default function Tables() {
       update.current_order_id = ""; update.current_order_number = ""; update.current_amount = 0; update.time_occupied = ""; update.customers = 0;
     }
     if (status === "occupied") update.time_occupied = new Date().toISOString();
-    await base44.entities.RestaurantTable.update(t.id, update);
-    await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "update_table", module: "Tables", description: `Table ${t.table_number} → ${status}` });
+    await db.entities.RestaurantTable.update(t.id, update);
+    await db.entities.AuditLog.create({ user_name: user?.full_name, action: "update_table", module: "Tables", description: `Table ${t.table_number} → ${status}` });
     load();
   };
 
   const remove = async (t) => {
     if (!confirm(`Delete Table ${t.table_number}?`)) return;
-    await base44.entities.RestaurantTable.delete(t.id);
+    await db.entities.RestaurantTable.delete(t.id);
     load();
   };
 
@@ -99,7 +99,7 @@ function TableForm({ onClose, onSaved }) {
     if (!number) return toast({ title: "Table number required", variant: "destructive" });
     setSaving(true);
     try {
-      await base44.entities.RestaurantTable.create({ table_number: number, seats: Number(seats), status: "available" });
+      await db.entities.RestaurantTable.create({ table_number: number, seats: Number(seats), status: "available" });
       toast({ title: "Table added" });
       onSaved();
     } catch (e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }

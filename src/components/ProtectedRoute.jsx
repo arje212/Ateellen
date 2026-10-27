@@ -22,15 +22,15 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     return fallback;
   }
 
+  if (!isAuthenticated) {
+    return unauthenticatedElement;
+  }
+
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     }
-    return unauthenticatedElement;
-  }
-
-  if (!isAuthenticated) {
-    return unauthenticatedElement;
+    return <UserNotRegisteredError title="Couldn't load your account" message={authError.message} />;
   }
 
   return <Outlet />;

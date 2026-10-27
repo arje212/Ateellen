@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { ChefHat, Clock, Flame, Check, Utensils, X, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -19,7 +19,7 @@ export default function Kitchen() {
 
   const load = async () => {
     try {
-      const res = await base44.entities.Order.filter(
+      const res = await db.entities.Order.filter(
         { status: { $in: ["new", "preparing", "ready"] } },
         { sort: "created_date", limit: 100 }
       );
@@ -30,16 +30,16 @@ export default function Kitchen() {
 
   useEffect(() => {
     load();
-    const unsub = base44.entities.Order.subscribe(() => load());
+    const unsub = db.entities.Order.subscribe(() => load());
     const interval = setInterval(load, 15000);
     return () => { unsub(); clearInterval(interval); };
   }, []);
 
   const advance = async (order, newStatus) => {
     try {
-      await base44.entities.Order.update(order.id, { status: newStatus });
+      await db.entities.Order.update(order.id, { status: newStatus });
       if (newStatus === "ready") {
-        await base44.entities.AppNotification.create({ type: "order_ready", title: "Order ready to serve", message: order.order_number, module: "pos", related_id: order.id });
+        await db.entities.AppNotification.create({ type: "order_ready", title: "Order ready to serve", message: order.order_number, module: "pos", related_id: order.id });
       }
       toast({ title: `${order.order_number} → ${ORDER_STATUSES[newStatus]}` });
       load();
@@ -50,7 +50,7 @@ export default function Kitchen() {
 
   const cancel = async (order) => {
     if (!confirm(`Cancel ${order.order_number}?`)) return;
-    await base44.entities.Order.update(order.id, { status: "cancelled" });
+    await db.entities.Order.update(order.id, { status: "cancelled" });
     toast({ title: "Order cancelled" });
     load();
   };

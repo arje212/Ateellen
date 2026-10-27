@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
-import { UserPlus, Mail, Shield, X } from "lucide-react";
+import { UserPlus, Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDate } from "@/lib/restaurant";
-import { cn } from "@/lib/utils";
 
 const ROLES = ["admin", "user"];
+const ALL_ROLES = ["pending", ...ROLES]; // "pending" = signed up, waiting for approval
 
 export default function Users() {
   const { toast } = useToast();
@@ -19,14 +19,14 @@ export default function Users() {
   const [showInvite, setShowInvite] = useState(false);
 
   const load = async () => {
-    try { const r = await base44.entities.User.list({ limit: 100 }); setUsers(r.items || []); } catch(e) {}
+    try { const r = await db.entities.User.list({ limit: 100 }); setUsers(r.items || []); } catch(e) {}
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
   const changeRole = async (u, role) => {
     try {
-      await base44.entities.User.update(u.id, { role });
+      await db.entities.User.update(u.id, { role });
       toast({ title: `${u.email} → ${role}` });
       load();
     } catch(e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
@@ -56,8 +56,8 @@ export default function Users() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                   <td className="px-4 py-3">
-                    <select value={u.role || "user"} onChange={e => changeRole(u, e.target.value)} className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs">
-                      {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    <select value={u.role || "pending"} onChange={e => changeRole(u, e.target.value)} className={`bg-secondary border rounded-lg px-2 py-1 text-xs ${u.role === "pending" ? "border-amber-500 text-amber-500" : "border-border"}`}>
+                      {(u.role === "pending" ? ALL_ROLES : ROLES).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(u.created_date)}</td>
@@ -84,8 +84,8 @@ function InviteForm({ onClose, onSaved }) {
     if (!email) return toast({ title: "Email required", variant: "destructive" });
     setSaving(true);
     try {
-      await base44.users.inviteUser(email, role);
-      toast({ title: "Invitation sent", description: email });
+      await db.users.inviteUser(email, role);
+      toast({ title: "Email approved", description: `${email} can now sign up at /register and will get the "${role}" role automatically.` });
       onSaved();
     } catch(e) { toast({ title: "Invite failed", description: e.message, variant: "destructive" }); }
     setSaving(false);

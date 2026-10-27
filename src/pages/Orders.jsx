@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Search, Eye, Printer, Ban, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default function Orders() {
   const [viewing, setViewing] = useState(null);
 
   const load = async () => {
-    const res = await base44.entities.Order.filter({}, { sort: "-created_date", limit: 200 });
+    const res = await db.entities.Order.filter({}, { sort: "-created_date", limit: 200 });
     setOrders(res.items || []);
     setLoading(false);
   };
@@ -36,20 +36,20 @@ export default function Orders() {
   const updateStatus = async (order, status) => {
     const verb = status === "cancelled" ? "cancel" : status === "completed" ? "complete" : "update";
     if (!confirm(`Are you sure you want to ${verb} ${order.order_number}?`)) return;
-    await base44.entities.Order.update(order.id, { status });
+    await db.entities.Order.update(order.id, { status });
     if (status === "completed" && order.table_number) {
-      const t = await base44.entities.RestaurantTable.filter({ table_number: order.table_number }, { limit: 1 });
-      if (t.items[0]) await base44.entities.RestaurantTable.update(t.items[0].id, { status: "cleaning", current_order_id: "", current_order_number: "", current_amount: 0 });
+      const t = await db.entities.RestaurantTable.filter({ table_number: order.table_number }, { limit: 1 });
+      if (t.items[0]) await db.entities.RestaurantTable.update(t.items[0].id, { status: "cleaning", current_order_id: "", current_order_number: "", current_amount: 0 });
     }
-    await base44.entities.AuditLog.create({ user_name: user?.full_name, action: `${verb}_order`, module: "Orders", description: `${order.order_number} → ${status}` });
+    await db.entities.AuditLog.create({ user_name: user?.full_name, action: `${verb}_order`, module: "Orders", description: `${order.order_number} → ${status}` });
     toast({ title: `${order.order_number} ${ORDER_STATUSES[status]}` });
     load();
   };
 
   const refund = async (order) => {
     if (!confirm(`Refund ${order.order_number} (${formatPeso(order.total)})?`)) return;
-    await base44.entities.Order.update(order.id, { payment_status: "refunded" });
-    await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "refund_order", module: "Orders", description: `Refunded ${order.order_number}` });
+    await db.entities.Order.update(order.id, { payment_status: "refunded" });
+    await db.entities.AuditLog.create({ user_name: user?.full_name, action: "refund_order", module: "Orders", description: `Refunded ${order.order_number}` });
     toast({ title: "Order refunded" });
     load();
   };

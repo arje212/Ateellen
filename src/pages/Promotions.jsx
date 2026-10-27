@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, Pencil, Trash2, X, Tag, Power, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,11 @@ export default function Promotions() {
   const [editing, setEditing] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  const load = async () => { const r = await base44.entities.Discount.filter({ type: { $in: ["promo", "fixed", "percentage"] } }, { sort: "-created_date", limit: 100 }); setItems(r.items||[]); setLoading(false); };
+  const load = async () => { const r = await db.entities.Discount.filter({ type: { $in: ["promo", "fixed", "percentage"] } }, { sort: "-created_date", limit: 100 }); setItems(r.items||[]); setLoading(false); };
   useEffect(() => { load(); }, []);
 
-  const toggle = async (d) => { await base44.entities.Discount.update(d.id, { active: !d.active }); load(); };
-  const remove = async (d) => { if (!confirm(`Delete ${d.name}?`)) return; await base44.entities.Discount.delete(d.id); load(); };
+  const toggle = async (d) => { await db.entities.Discount.update(d.id, { active: !d.active }); load(); };
+  const remove = async (d) => { if (!confirm(`Delete ${d.name}?`)) return; await db.entities.Discount.delete(d.id); load(); };
 
   return (
     <div className="space-y-5">
@@ -63,7 +63,7 @@ function PromoForm({ promo, onClose, onSaved }) {
     e.preventDefault();
     if (!form.name) return toast({ title: "Name required", variant: "destructive" });
     setSaving(true);
-    try { const p = { ...form, value: Number(form.value), minimum_purchase: Number(form.minimum_purchase), maximum_discount: Number(form.maximum_discount) }; if (promo) await base44.entities.Discount.update(promo.id, p); else await base44.entities.Discount.create(p); toast({title:"Saved"}); onSaved(); }
+    try { const p = { ...form, value: Number(form.value), minimum_purchase: Number(form.minimum_purchase), maximum_discount: Number(form.maximum_discount) }; if (promo) await db.entities.Discount.update(promo.id, p); else await db.entities.Discount.create(p); toast({title:"Saved"}); onSaved(); }
     catch(e){ toast({title:"Failed",description:e.message,variant:"destructive"}); }
     setSaving(false);
   };

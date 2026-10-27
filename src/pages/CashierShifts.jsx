@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Play, Square, X, Receipt, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ export default function CashierShifts() {
   const [showOpen, setShowOpen] = useState(false);
   const [showClose, setShowClose] = useState(null);
 
-  const load = async () => { const r = await base44.entities.CashierShift.filter({}, { sort: "-created_date", limit: 50 }); setShifts(r.items||[]); setLoading(false); };
+  const load = async () => { const r = await db.entities.CashierShift.filter({}, { sort: "-created_date", limit: 50 }); setShifts(r.items||[]); setLoading(false); };
   useEffect(() => { load(); }, []);
 
   const active = shifts.find(s => s.status === "open");
@@ -80,8 +80,8 @@ function OpenShiftForm({ onClose, onSaved, user }) {
     e.preventDefault();
     setSaving(true);
     try {
-      await base44.entities.CashierShift.create({ cashier_name: user?.full_name || "Cashier", opening_cash: Number(opening), opened_at: new Date().toISOString(), status: "open" });
-      await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "open_shift", module: "Shifts", description: `Opened shift with ${formatPeso(opening)}` });
+      await db.entities.CashierShift.create({ cashier_name: user?.full_name || "Cashier", opening_cash: Number(opening), opened_at: new Date().toISOString(), status: "open" });
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: "open_shift", module: "Shifts", description: `Opened shift with ${formatPeso(opening)}` });
       toast({ title: "Shift opened" });
       onSaved();
     } catch(e){ toast({ title:"Failed", description:e.message, variant:"destructive" }); }
@@ -114,14 +114,14 @@ function CloseShiftForm({ shift, onClose, onSaved, user }) {
     setSaving(true);
     try {
       // compute sales since shift opened
-      const orders = await base44.entities.Order.filter({ created_date: { $gte: shift.opened_at }, status: { $ne: "cancelled" } }, { limit: 1000 });
+      const orders = await db.entities.Order.filter({ created_date: { $gte: shift.opened_at }, status: { $ne: "cancelled" } }, { limit: 1000 });
       const total_sales = (orders.items||[]).reduce((s,o)=>s+(o.total||0),0);
       const cash_sales = (orders.items||[]).filter(o=>o.payment_method==="cash").reduce((s,o)=>s+(o.total||0),0);
       const digital_sales = total_sales - cash_sales;
       const expected_cash = shift.opening_cash + cash_sales;
       const diff = Number(actual) - expected_cash;
-      await base44.entities.CashierShift.update(shift.id, { status: "closed", closed_at: new Date().toISOString(), total_sales, total_orders: (orders.items||[]).length, cash_sales, digital_sales, expected_cash, actual_cash: Number(actual), difference: diff });
-      await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "close_shift", module: "Shifts", description: `Closed shift · diff ${formatPeso(diff)}` });
+      await db.entities.CashierShift.update(shift.id, { status: "closed", closed_at: new Date().toISOString(), total_sales, total_orders: (orders.items||[]).length, cash_sales, digital_sales, expected_cash, actual_cash: Number(actual), difference: diff });
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: "close_shift", module: "Shifts", description: `Closed shift · diff ${formatPeso(diff)}` });
       toast({ title: "Shift closed", description: `Difference: ${formatPeso(diff)}` });
       onSaved();
     } catch(e){ toast({ title:"Failed", description:e.message, variant:"destructive" }); }

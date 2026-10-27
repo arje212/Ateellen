@@ -151,6 +151,39 @@ app.get(`${base}/v2/list`, (req, res) => {
 });
 app.get(base, (req, res) => res.json(listRecords(req.params.entity, req.query)));
 
+// aggregate: groupBy / dateBucket + sum / count (used by the Dashboard)
+app.post(`${base}/aggregate`, (req, res) => {
+  const { query = {}, groupBy, dateBucket, sum } = req.body || {};
+  const items = listRecords(req.params.entity, { q: JSON.stringify(query) });
+
+  const keyOf = (o) => {
+    if (dateBucket) {
+      const d = o[dateBucket.field];
+      if (!d) return null;
+      const s = new Date(d).toISOString();
+      if (dateBucket.unit === 'hour') return s.slice(0, 13) + ':00';
+      if (dateBucket.unit === 'month') return s.slice(0, 7);
+      return s.slice(0, 10); // day
+    }
+    if (groupBy) return o[groupBy] ?? null;
+    return 'all';
+  };
+
+  const groups = new Map();
+  for (const o of items) {
+    const k = keyOf(o);
+    if (!groups.has(k)) groups.set(k, { _id: k, count: 0 });
+    const g = groups.get(k);
+    g.count += 1;
+    if (sum) g[`sum_${sum}`] = (g[`sum_${sum}`] || 0) + (Number(o[sum]) || 0);
+  }
+
+  const rows = [...groups.values()].sort((a, b) =>
+    String(a._id).localeCompare(String(b._id))
+  );
+  res.json({ rows });
+});
+
 // bulk create
 app.post(`${base}/bulk`, (req, res) => {
   const items = Array.isArray(req.body) ? req.body : [];
@@ -199,9 +232,13 @@ app.delete(`${base}/:id`, (req, res) => {
   res.json({ ok: true });
 });
 
-// anything else: log it so we know what's still missing
+// anything else: log it (with body) so we know what's still missing
 app.use('/api', (req, res) => {
-  console.warn(`[unhandled] ${req.method} ${req.originalUrl}`);
+  console.warn(
+    `[unhandled] ${req.method} ${req.originalUrl}`,
+    JSON.stringify(req.body),
+    JSON.stringify(req.query)
+  );
   res.status(404).json({ error: 'Not implemented in local backend' });
 });
 

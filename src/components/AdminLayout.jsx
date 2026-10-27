@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import {
   LayoutDashboard, ShoppingCart, ClipboardList, Grid3x3, ChefHat,
   UtensilsCrossed, Package, Truck, Wallet, Users, Tag, Percent,
@@ -48,7 +48,7 @@ export default function AdminLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
-    base44.entities.AppNotification.filter({ read: false }, { sort: "-created_date", limit: 8 })
+    db.entities.AppNotification.filter({ read: false }, { sort: "-created_date", limit: 8 })
       .then(res => setNotifications(res.items || []))
       .catch(() => {});
   }, [location.pathname]);
@@ -60,7 +60,7 @@ export default function AdminLayout() {
     : location.pathname.startsWith(item.path);
 
   const handleLogout = async () => {
-    await base44.auth.logout();
+    await db.auth.logout();
     window.location.href = "/login";
   };
 

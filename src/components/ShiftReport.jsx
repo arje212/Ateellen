@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { X, Wallet, Printer, CheckCircle2, AlertTriangle, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,10 @@ export default function ShiftReport({ onClose }) {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await base44.entities.CashierShift.filter({ status: "open" }, { sort: "-opened_at", limit: 1 });
+      const r = await db.entities.CashierShift.filter({ status: "open" }, { sort: "-opened_at", limit: 1 });
       const active = (r.items || [])[0];
       if (active) {
-        const orders = await base44.entities.Order.filter(
+        const orders = await db.entities.Order.filter(
           { created_date: { $gte: active.opened_at }, status: { $ne: "cancelled" } },
           { limit: 1000 }
         );
@@ -33,7 +33,7 @@ export default function ShiftReport({ onClose }) {
         const cash_sales = items.filter((o) => o.payment_method === "cash").reduce((s, o) => s + (o.total || 0), 0);
         setShift({ ...active, orders: items.length, cash_sales, digital_sales: total_sales - cash_sales, total_sales });
       } else {
-        const cr = await base44.entities.CashierShift.filter({ status: "closed" }, { sort: "-closed_at", limit: 1 });
+        const cr = await db.entities.CashierShift.filter({ status: "closed" }, { sort: "-closed_at", limit: 1 });
         setShift((cr.items || [])[0] || null);
       }
     } catch (e) {
@@ -52,7 +52,7 @@ export default function ShiftReport({ onClose }) {
     try {
       const actualNum = Number(actual) || 0;
       const diff = actualNum - expectedCash;
-      await base44.entities.CashierShift.update(shift.id, {
+      await db.entities.CashierShift.update(shift.id, {
         status: "closed",
         closed_at: new Date().toISOString(),
         total_sales: shift.total_sales,
@@ -63,7 +63,7 @@ export default function ShiftReport({ onClose }) {
         actual_cash: actualNum,
         difference: diff,
       });
-      await base44.entities.AuditLog.create({
+      await db.entities.AuditLog.create({
         user_name: user?.full_name,
         action: "generate_shift_report",
         module: "Shifts",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { TrendingUp, ShoppingBag, Receipt, Wallet, Package, AlertTriangle, Clock, CheckCircle2, ArrowUpRight, Flame } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell, Legend } from "recharts";
 import { formatPeso, ORDER_TYPES, PAYMENT_METHODS } from "@/lib/restaurant";
@@ -32,12 +32,12 @@ export default function Dashboard() {
 
       try {
         const [ordersRes, expRes, invRes, aggPay, aggCat, aggHour] = await Promise.all([
-          base44.entities.Order.filter({ created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, { sort: "-created_date", limit: 500 }),
-          base44.entities.Expense.filter({ expense_date: { $gte: start.toISOString().slice(0,10) } }, { limit: 200 }),
-          base44.entities.InventoryItem.filter({ status: { $in: ["low_stock", "out_of_stock"] } }, { limit: 50 }),
-          base44.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "payment_method", sum: "total" }),
-          base44.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "table_number", sum: "total" }),
-          base44.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, dateBucket: { field: "created_date", unit: "day" }, sum: "total" }),
+          db.entities.Order.filter({ created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, { sort: "-created_date", limit: 500 }),
+          db.entities.Expense.filter({ expense_date: { $gte: start.toISOString().slice(0,10) } }, { limit: 200 }),
+          db.entities.InventoryItem.filter({ status: { $in: ["low_stock", "out_of_stock"] } }, { limit: 50 }),
+          db.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "payment_method", sum: "total" }),
+          db.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "table_number", sum: "total" }),
+          db.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, dateBucket: { field: "created_date", unit: "day" }, sum: "total" }),
         ]);
 
         const orders = ordersRes.items || [];
@@ -65,7 +65,7 @@ export default function Dashboard() {
         setByPayment((aggPay.rows||[]).map(r => ({ name: PAYMENT_METHODS[r._id] || r._id, value: r.sum_total || 0 })));
 
         // by category: derive from items by joining product category_name (stored on item? no). Use order_type grouping instead for a meaningful pie.
-        const aggType = await base44.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "order_type", sum: "total" });
+        const aggType = await db.entities.Order.aggregate({ query: { created_date: { $gte: startISO }, status: { $ne: "cancelled" } }, groupBy: "order_type", sum: "total" });
         setByCategory((aggType.rows||[]).map(r => ({ name: ORDER_TYPES[r._id] || r._id, value: r.sum_total || 0 })));
 
         setRecent(orders.slice(0,6));

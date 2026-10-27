@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, Pencil, Trash2, X, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export default function Expenses() {
   const [editing, setEditing] = useState(null);
 
   const load = async () => {
-    const res = await base44.entities.Expense.filter({}, { sort: "-expense_date", limit: 200 });
+    const res = await db.entities.Expense.filter({}, { sort: "-expense_date", limit: 200 });
     setExpenses(res.items || []);
     setLoading(false);
   };
@@ -31,7 +31,7 @@ export default function Expenses() {
 
   const remove = async (e) => {
     if (!confirm(`Delete this expense?`)) return;
-    await base44.entities.Expense.delete(e.id);
+    await db.entities.Expense.delete(e.id);
     load();
   };
 
@@ -104,9 +104,9 @@ function ExpenseForm({ expense, onClose, onSaved, user }) {
     setSaving(true);
     try {
       const payload = { ...form, amount: Number(form.amount) };
-      if (expense) await base44.entities.Expense.update(expense.id, payload);
-      else await base44.entities.Expense.create(payload);
-      await base44.entities.AuditLog.create({ user_name: user?.full_name, action: expense?"update_expense":"create_expense", module: "Expenses", description: `${form.category} ${formatPeso(form.amount)}` });
+      if (expense) await db.entities.Expense.update(expense.id, payload);
+      else await db.entities.Expense.create(payload);
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: expense?"update_expense":"create_expense", module: "Expenses", description: `${form.category} ${formatPeso(form.amount)}` });
       toast({ title: "Saved" });
       onSaved();
     } catch (e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }

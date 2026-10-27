@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Plus, Pencil, Trash2, X, Truck, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,10 @@ export default function Suppliers() {
   const [editing, setEditing] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  const load = async () => { const r = await base44.entities.Supplier.filter({}, { sort: "name", limit: 200 }); setItems(r.items||[]); setLoading(false); };
+  const load = async () => { const r = await db.entities.Supplier.filter({}, { sort: "name", limit: 200 }); setItems(r.items||[]); setLoading(false); };
   useEffect(() => { load(); }, []);
 
-  const remove = async (s) => { if (!confirm(`Delete ${s.name}?`)) return; await base44.entities.Supplier.delete(s.id); load(); };
+  const remove = async (s) => { if (!confirm(`Delete ${s.name}?`)) return; await db.entities.Supplier.delete(s.id); load(); };
 
   return (
     <div className="space-y-5">
@@ -62,7 +62,7 @@ function SupplierForm({ supplier, onClose, onSaved }) {
     e.preventDefault();
     if (!form.name) return toast({ title: "Name required", variant: "destructive" });
     setSaving(true);
-    try { if (supplier) await base44.entities.Supplier.update(supplier.id, form); else await base44.entities.Supplier.create(form); toast({title:"Saved"}); onSaved(); }
+    try { if (supplier) await db.entities.Supplier.update(supplier.id, form); else await db.entities.Supplier.create(form); toast({title:"Saved"}); onSaved(); }
     catch(e){ toast({title:"Failed",description:e.message,variant:"destructive"}); }
     setSaving(false);
   };

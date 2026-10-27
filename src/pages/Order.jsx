@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { Search, Plus, Minus, ShoppingCart, X, Trash2, ArrowLeft, Flame, Leaf, Check, Clock } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
@@ -32,8 +32,8 @@ export default function Order() {
     let active = true;
 
     Promise.allSettled([
-      base44.entities.Category.list({ sort: "sort_order", limit: 50 }),
-      base44.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
+      db.entities.Category.list({ sort: "sort_order", limit: 50 }),
+      db.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
     ]).then(([categoryResult, productResult]) => {
       if (!active) return;
       if (categoryResult.status === "fulfilled" && categoryResult.value.items?.length) {
@@ -90,15 +90,10 @@ export default function Order() {
       const today = new Date();
       const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
 
-      // FIX: the local backend has no /count endpoint (it returned 404).
-      // Use filter instead and read the "total" from the response.
+      // Visitors can't read the orders table (privacy), so count through a DB function.
       let count = 0;
       try {
-        const res = await base44.entities.Order.filter(
-          { order_number: { $regex: `ORD-${ymd}` } },
-          { limit: 1 }
-        );
-        count = res?.total ?? res?.items?.length ?? 0;
+        count = await db.rpc("count_orders_with_prefix", { prefix: `ORD-${ymd}` });
       } catch {
         // If counting fails for any reason, fall back to a time-based sequence
         // so the order can still be placed.
@@ -106,7 +101,7 @@ export default function Order() {
       }
       const order_number = generateOrderNumber(count);
 
-      const order = await base44.entities.Order.create({
+      const order = await db.entities.Order.create({
         order_number,
         order_type: orderType,
         status: "new",
@@ -122,7 +117,7 @@ export default function Order() {
         payment_status: "unpaid",
         source: "online",
       });
-      await base44.entities.AppNotification.create({
+      await db.entities.AppNotification.create({
         type: "new_order",
         title: "New online order",
         message: `${order_number} placed by ${customer.name || "Table " + tableNumber}`,

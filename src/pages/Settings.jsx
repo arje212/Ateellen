@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
 import { Save, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    base44.entities.AppSetting.list({ limit: 1 }).then(r => setForm((r.items||[])[0] || {
+    db.entities.AppSetting.list({ limit: 1 }).then(r => setForm((r.items||[])[0] || {
       restaurant_name: "Daddy's Sizzlers", address: "", phone: "", email: "", facebook_page: "", business_hours: "Mon–Sun, 10AM–10PM", currency: "PHP", timezone: "Asia/Manila",
     }));
   }, []);
@@ -24,9 +24,9 @@ export default function Settings() {
     e.preventDefault();
     setSaving(true);
     try {
-      if (form.id) await base44.entities.AppSetting.update(form.id, form);
-      else { const created = await base44.entities.AppSetting.create(form); setForm(created); }
-      await base44.entities.AuditLog.create({ user_name: user?.full_name, action: "update_settings", module: "Settings", description: "Updated restaurant settings" });
+      if (form.id) await db.entities.AppSetting.update(form.id, form);
+      else { const created = await db.entities.AppSetting.create(form); setForm(created); }
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: "update_settings", module: "Settings", description: "Updated restaurant settings" });
       toast({ title: "Settings saved" });
     } catch (e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
     setSaving(false);

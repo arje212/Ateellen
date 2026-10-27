@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { db } from "@/api/db";
 import { Download, TrendingUp, BarChart3, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from "recharts";
@@ -18,8 +18,8 @@ export default function Reports() {
     const startISO = new Date(from).toISOString();
     const endISO = new Date(to + "T23:59:59").toISOString();
     const [o, e] = await Promise.all([
-      base44.entities.Order.filter({ created_date: { $gte: startISO, $lte: endISO } }, { sort: "-created_date", limit: 1000 }),
-      base44.entities.Expense.filter({ expense_date: { $gte: from, $lte: to } }, { limit: 500 }),
+      db.entities.Order.filter({ created_date: { $gte: startISO, $lte: endISO } }, { sort: "-created_date", limit: 1000 }),
+      db.entities.Expense.filter({ expense_date: { $gte: from, $lte: to } }, { limit: 500 }),
     ]);
     setOrders(o.items || []);
     setExpenses(e.items || []);

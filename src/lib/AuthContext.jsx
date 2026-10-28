@@ -26,9 +26,9 @@ export const AuthProvider = ({ children }) => {
         prev && prev.id === profile.id && prev.role === profile.role && prev.full_name === profile.full_name ? prev : profile
       );
       setIsAuthenticated(true);
-      // 'pending' = signed up but not approved by an admin yet
-      if (!profile.role || profile.role === 'pending') {
-        setAuthError({ type: 'user_not_registered', message: 'Your account is waiting for admin approval.' });
+      // Only approved staff (admin / cashier) may enter; 'pending' accounts wait for an admin
+      if (!['admin', 'cashier'].includes(profile.role)) {
+        setAuthError({ type: 'user_not_registered', message: 'Your account has not been approved yet. Please ask the admin.' });
       } else {
         setAuthError(null);
       }

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "@/api/db";
-import { ChefHat, Clock, Flame, Check, Utensils, X, Bell } from "lucide-react";
+import { ChefHat, Clock, Flame, Check, Utensils, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { ORDER_TYPES, ORDER_STATUSES, STATUS_COLORS, elapsedMinutes, formatPeso } from "@/lib/restaurant";
+import { playBeep } from "@/lib/sound";
+import { ORDER_TYPES, ORDER_STATUSES, elapsedMinutes, addonsText } from "@/lib/restaurant";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = [
@@ -16,6 +17,7 @@ export default function Kitchen() {
   const { toast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const seenIds = useRef(null); // null until first load, so we don't beep for existing tickets
 
   const load = async () => {
     try {
@@ -23,7 +25,11 @@ export default function Kitchen() {
         { status: { $in: ["new", "preparing", "ready"] } },
         { sort: "created_date", limit: 100 }
       );
-      setOrders(res.items || []);
+      const items = res.items || [];
+      const newIds = items.filter(o => o.status === "new").map(o => o.id);
+      if (seenIds.current && newIds.some(id => !seenIds.current.has(id))) playBeep();
+      seenIds.current = new Set(items.map(o => o.id));
+      setOrders(items);
     } catch (e) { /* ignore */ }
     setLoading(false);
   };
@@ -92,6 +98,9 @@ export default function Kitchen() {
                         <div>
                           <div className="font-display font-700 text-lg leading-none">{o.order_number}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{ORDER_TYPES[o.order_type]} {o.table_number ? `· Table ${o.table_number}` : ""}</div>
+                          {["gcash", "maya"].includes(o.payment_method) && o.payment_status === "unpaid" && (
+                            <div className="text-[11px] font-700 text-amber-400 mt-1">⚠ {o.payment_method.toUpperCase()} not yet confirmed (ref {o.payment_reference || "—"})</div>
+                          )}
                         </div>
                         <div className={cn("flex items-center gap-1 text-xs font-700 px-2 py-1 rounded-lg", delayed ? "bg-destructive/15 text-destructive" : "bg-secondary text-muted-foreground")}>
                           <Clock className="w-3.5 h-3.5" /> {mins}m
@@ -101,7 +110,10 @@ export default function Kitchen() {
                         {o.items?.map((i, idx) => (
                           <div key={idx} className="flex items-baseline gap-2 text-sm">
                             <span className="font-700 text-primary">{i.quantity}×</span>
-                            <span className="flex-1">{i.name}{i.variant ? ` (${i.variant})` : ""}</span>
+                            <span className="flex-1">
+                              {i.name}{i.variant ? ` (${i.variant})` : ""}
+                              {i.addons?.length > 0 && <span className="block text-xs font-700 text-accent">+ {addonsText(i)}</span>}
+                            </span>
                           </div>
                         ))}
                         {o.notes && <div className="text-xs text-accent bg-accent/10 rounded-lg px-2 py-1 mt-2">📝 {o.notes}</div>}

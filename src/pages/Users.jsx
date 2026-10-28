@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDate } from "@/lib/restaurant";
 
-const ROLES = ["admin", "user"];
+const ROLES = ["admin", "cashier"];
 const ALL_ROLES = ["pending", ...ROLES]; // "pending" = signed up, waiting for approval
 
 export default function Users() {
@@ -97,7 +97,7 @@ function InviteForm({ onClose, onSaved }) {
         <div className="p-5 space-y-3">
           <div><Label>Email</Label><Input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@email.com" className="mt-1" /></div>
           <div><Label>Role</Label><select value={role} onChange={e=>setRole(e.target.value)} className="mt-1 w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm capitalize">{ROLES.map(r=><option key={r} value={r} className="capitalize">{r}</option>)}</select></div>
-          <div className="text-xs text-muted-foreground bg-secondary/40 rounded-lg p-3">Admin: full access. User: limited staff access (POS, orders, kitchen).</div>
+          <div className="text-xs text-muted-foreground bg-secondary/40 rounded-lg p-3">Admin: full access · Cashier: POS, Orders, Kitchen, Tables, Customers & Shifts only.</div>
         </div>
         <div className="p-5 border-t border-border flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>

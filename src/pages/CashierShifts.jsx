@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
-import { Play, Square, X, Receipt, Wallet } from "lucide-react";
+import { Play, Square, X, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

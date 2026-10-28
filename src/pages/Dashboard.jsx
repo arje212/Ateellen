@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db } from "@/api/db";
-import { TrendingUp, ShoppingBag, Receipt, Wallet, Package, AlertTriangle, Clock, CheckCircle2, ArrowUpRight, Flame } from "lucide-react";
+import { TrendingUp, ShoppingBag, Receipt, Wallet, AlertTriangle, Clock, CheckCircle2, ArrowUpRight, Flame } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell, Legend } from "recharts";
 import { formatPeso, ORDER_TYPES, PAYMENT_METHODS } from "@/lib/restaurant";
 import { Link } from "react-router-dom";

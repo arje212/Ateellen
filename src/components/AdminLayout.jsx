@@ -5,18 +5,20 @@ import { db } from "@/api/db";
 import {
   LayoutDashboard, ShoppingCart, ClipboardList, Grid3x3, ChefHat,
   UtensilsCrossed, Package, Truck, Wallet, Users, Tag, Percent,
-  BarChart3, Receipt, ShieldCheck, Settings, Bell, LogOut, Menu, X,
+  BarChart3, Receipt, ShieldCheck, Settings, Bell, LogOut, Menu,
   Flame, Leaf
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { playBeep } from "@/lib/sound";
 
 const NAV = [
   { group: "Main", items: [
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard, exact: true },
-    { label: "POS", path: "/admin/pos", icon: ShoppingCart },
-    { label: "Orders", path: "/admin/orders", icon: ClipboardList },
-    { label: "Tables", path: "/admin/tables", icon: Grid3x3 },
-    { label: "Kitchen", path: "/admin/kitchen", icon: ChefHat },
+    { label: "POS", path: "/admin/pos", icon: ShoppingCart, cashier: true },
+    { label: "Orders", path: "/admin/orders", icon: ClipboardList, cashier: true },
+    { label: "Tables", path: "/admin/tables", icon: Grid3x3, cashier: true },
+    { label: "Kitchen", path: "/admin/kitchen", icon: ChefHat, cashier: true },
   ]},
   { group: "Catalog & Stock", items: [
     { label: "Menu", path: "/admin/menu", icon: UtensilsCrossed },
@@ -25,13 +27,13 @@ const NAV = [
     { label: "Expenses", path: "/admin/expenses", icon: Wallet },
   ]},
   { group: "CRM & Promos", items: [
-    { label: "Customers", path: "/admin/customers", icon: Users },
+    { label: "Customers", path: "/admin/customers", icon: Users, cashier: true },
     { label: "Promotions", path: "/admin/promotions", icon: Tag },
     { label: "Discounts", path: "/admin/discounts", icon: Percent },
   ]},
   { group: "Insights & Admin", items: [
     { label: "Reports", path: "/admin/reports", icon: BarChart3 },
-    { label: "Cashier Shifts", path: "/admin/shifts", icon: Receipt },
+    { label: "Cashier Shifts", path: "/admin/shifts", icon: Receipt, cashier: true },
     { label: "Users", path: "/admin/users", icon: ShieldCheck },
     { label: "Audit Logs", path: "/admin/audit", icon: ClipboardList },
     { label: "Settings", path: "/admin/settings", icon: Settings },
@@ -42,7 +44,11 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const isAdmin = user?.role === "admin";
   const [open, setOpen] = useState(false);
+  const [shop, setShop] = useState(undefined); // app_settings row (undefined = loading, null = none yet)
+  const [alertsPermission, setAlertsPermission] = useState(typeof Notification !== "undefined" ? Notification.permission : "denied");
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -54,6 +60,43 @@ export default function AdminLayout() {
   }, [location.pathname]);
 
   useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  // live alerts: new online order / cancelled / low stock, on any admin page
+  useEffect(() => {
+    const unsub = db.entities.AppNotification.subscribe((ev) => {
+      if (ev.type !== "insert" || !ev.data) return;
+      const n = ev.data;
+      setNotifications(prev => [n, ...prev.filter(x => x.id !== n.id)].slice(0, 8));
+      if (!["new_order", "order_cancelled", "low_stock"].includes(n.type)) return;
+      if (n.type === "new_order" && !window.location.pathname.includes("/kitchen")) playBeep();
+      toast({ title: n.title, description: n.message });
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(n.title, { body: n.message });
+      } catch { /* ignore */ }
+    });
+    return unsub;
+  }, []);
+
+  // online-ordering switch
+  useEffect(() => {
+    db.entities.AppSetting.list({ limit: 1 }).then(r => setShop((r.items || [])[0] || null)).catch(() => setShop(null));
+  }, []);
+  const orderingOn = shop ? shop.online_ordering_enabled !== false : true;
+  const toggleOrdering = async () => {
+    if (!isAdmin) return;
+    const next = !orderingOn;
+    if (!next && !confirm("Stop accepting online orders? Customers will see the store as closed.")) return;
+    try {
+      const saved = shop?.id
+        ? await db.entities.AppSetting.update(shop.id, { online_ordering_enabled: next })
+        : await db.entities.AppSetting.create({ restaurant_name: "Daddy's Sizzlers", online_ordering_enabled: next });
+      setShop(saved);
+      toast({ title: next ? "Online ordering is ON" : "Online ordering is OFF" });
+    } catch (e) { toast({ title: "Could not update", description: e.message, variant: "destructive" }); }
+  };
+  const enableAlerts = async () => {
+    try { setAlertsPermission(await Notification.requestPermission()); } catch { /* ignore */ }
+  };
 
   const isActive = (item) => item.exact
     ? location.pathname === item.path
@@ -81,7 +124,7 @@ export default function AdminLayout() {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-5">
-          {NAV.map(sec => (
+          {NAV.map(sec => ({ ...sec, items: sec.items.filter(i => isAdmin || i.cashier) })).filter(sec => sec.items.length > 0).map(sec => (
             <div key={sec.group}>
               <div className="px-3 mb-1.5 text-[10px] font-600 uppercase tracking-[0.16em] text-muted-foreground/70">{sec.group}</div>
               <div className="space-y-0.5">
@@ -127,6 +170,18 @@ export default function AdminLayout() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {shop !== undefined && (
+              <button onClick={toggleOrdering} disabled={!isAdmin} title={isAdmin ? "Click to open/close online ordering" : "Only admins can change this"}
+                className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-700 border transition-colors",
+                  orderingOn ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-destructive/15 text-destructive border-destructive/30",
+                  !isAdmin && "cursor-default")}>
+                <span className={cn("w-2 h-2 rounded-full", orderingOn ? "bg-emerald-400" : "bg-destructive")} />
+                <span className="hidden sm:inline">Online orders:</span> {orderingOn ? "OPEN" : "CLOSED"}
+              </button>
+            )}
+            {alertsPermission === "default" && (
+              <button onClick={enableAlerts} className="hidden md:block text-xs text-primary border border-primary/30 rounded-full px-3 py-1.5 hover:bg-primary/10">🔔 Enable alerts</button>
+            )}
             <div className="relative">
               <button onClick={() => setNotifOpen(v => !v)} className="relative p-2.5 rounded-xl hover:bg-secondary transition-colors">
                 <Bell className="w-5 h-5" />
@@ -158,7 +213,7 @@ export default function AdminLayout() {
               </button>
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden">
-                  <Link to="/admin/settings" className="block px-4 py-2.5 text-sm hover:bg-secondary">Settings</Link>
+                  {isAdmin && <Link to="/admin/settings" className="block px-4 py-2.5 text-sm hover:bg-secondary">Settings</Link>}
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2">
                     <LogOut className="w-4 h-4" /> Sign out
                   </button>

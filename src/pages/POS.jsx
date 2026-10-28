@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
-import { Search, Plus, Minus, X, Trash2, Flame, Pause, Play, Printer, Wallet, Check, ShoppingCart } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Flame, Pause, Printer, Wallet, ShoppingCart } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { formatPeso, generateOrderNumber, ORDER_TYPES, PAYMENT_METHODS } from "@/lib/restaurant";
+import { formatPeso, generateOrderNumber, ORDER_TYPES, PAYMENT_METHODS, addonsText, buildCartLine } from "@/lib/restaurant";
+import ProductOptionsModal from "@/components/ProductOptionsModal";
 import { cn } from "@/lib/utils";
 
 export default function POS() {
@@ -30,6 +31,8 @@ export default function POS() {
   const [heldOrders, setHeldOrders] = useState([]);
   const [paying, setPaying] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
+  const [addons, setAddons] = useState([]);
+  const [optionsFor, setOptionsFor] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -37,7 +40,9 @@ export default function POS() {
       db.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
       db.entities.RestaurantTable.list({ limit: 50 }),
       db.entities.Discount.filter({ active: true }, { limit: 50 }),
-    ]).then(([c, p, t, d]) => {
+      db.entities.Addon.filter({ active: true }, { sort: "sort_order", limit: 50 }),
+    ]).then(([c, p, t, d, a]) => {
+      setAddons(a.items || []);
       setCategories(c.items || []);
       setProducts(p.items || []);
       setTables(t.items || []);
@@ -51,15 +56,19 @@ export default function POS() {
     return true;
   }), [products, activeCat, search]);
 
-  const addToCart = (product, variant = null) => {
-    const key = product.id + (variant ? `-${variant.name}` : "");
-    const price = variant ? variant.price : product.price;
-    const name = variant ? `${product.name} (${variant.name})` : product.name;
+  const addLine = (line) => {
     setCart(prev => {
-      const ex = prev.find(i => i.key === key);
-      if (ex) return prev.map(i => i.key === key ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { key, product_id: product.id, name, price, quantity: 1, variant: variant?.name || "", notes: "" }];
+      const ex = prev.find(i => i.key === line.key);
+      if (ex) return prev.map(i => i.key === line.key ? { ...i, quantity: i.quantity + line.quantity } : i);
+      return [...prev, line];
     });
+    setOptionsFor(null);
+  };
+  const addonsFor = (product) => addons.filter(a => !a.category_ids?.length || a.category_ids.includes(product.category_id));
+  // sizes or add-ons available → open the options sheet, otherwise add straight to the cart
+  const pickProduct = (p) => {
+    if (p.variants?.length || addonsFor(p).length) setOptionsFor(p);
+    else addLine(buildCartLine(p, null, [], 1));
   };
 
   const setQty = (key, qty) => setCart(prev => prev.map(i => i.key === key ? { ...i, quantity: Math.max(0, qty) } : i).filter(i => i.quantity > 0));
@@ -175,10 +184,11 @@ export default function POS() {
         <div className="flex-1 overflow-y-auto scrollbar-thin pr-1">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
             {filtered.map(p => (
-              <button key={p.id} onClick={() => p.variants?.length ? openVariants(p) : addToCart(p)} className="bg-card border border-border rounded-2xl overflow-hidden text-left hover:border-primary/40 transition-colors group">
+              <button key={p.id} onClick={() => (p.sold_out ? null : pickProduct(p))} className="bg-card border border-border rounded-2xl overflow-hidden text-left hover:border-primary/40 transition-colors group">
                 <div className="aspect-square bg-secondary relative">
                   {p.image_url ? <Image src={p.image_url} alt={p.name} className="w-full h-full" fittingType="fill" /> :
                     <div className="w-full h-full flex items-center justify-center"><Flame className="w-8 h-8 text-primary/30" /></div>}
+                  {p.sold_out && <div className="absolute inset-0 z-10 bg-background/75 flex items-center justify-center"><span className="bg-destructive text-destructive-foreground text-xs font-700 uppercase px-3 py-1 rounded-full">Sold out</span></div>}
                   <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Plus className="w-7 h-7 text-primary-foreground bg-primary rounded-full p-1" />
                   </div>
@@ -224,6 +234,7 @@ export default function POS() {
             <div key={i.key} className="flex items-center gap-2 bg-secondary/30 rounded-xl p-2.5">
               <div className="flex-1 min-w-0">
                 <div className="font-600 text-sm truncate">{i.name}</div>
+                {i.addons?.length > 0 && <div className="text-xs text-accent truncate">+ {addonsText(i)}</div>}
                 <div className="text-xs text-muted-foreground">{formatPeso(i.price)} × {i.quantity} = <span className="text-primary font-600">{formatPeso(i.price*i.quantity)}</span></div>
               </div>
               <div className="flex items-center gap-1">
@@ -274,26 +285,26 @@ export default function POS() {
         </div>
       </div>
 
+      {optionsFor && (
+        <ProductOptionsModal product={optionsFor} addons={addonsFor(optionsFor)} onAdd={addLine} onClose={() => setOptionsFor(null)} showImage={false} />
+      )}
       {lastReceipt && <ReceiptModal order={lastReceipt} onClose={() => setLastReceipt(null)} />}
     </div>
   );
-
-  function openVariants(p) {
-    const choice = window.prompt(`Choose size: ${p.variants.map(v=>`${v.name}=${formatPeso(v.price)}`).join(", ")}\nType the size name:`, p.variants[0].name);
-    if (!choice) return;
-    const v = p.variants.find(x => x.name.toLowerCase() === choice.toLowerCase().trim());
-    if (v) addToCart(p, v); else toast({ title: "Invalid size", variant: "destructive" });
-  }
 }
 
 function ReceiptModal({ order, onClose }) {
+  const [shop, setShop] = useState(null);
+  useEffect(() => {
+    db.entities.AppSetting.list({ limit: 1 }).then(r => setShop(r.items?.[0] || null)).catch(() => {});
+  }, []);
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white text-black w-80 max-w-full rounded-2xl overflow-hidden font-mono text-xs" onClick={e => e.stopPropagation()}>
         <div className="p-5 text-center border-b border-dashed border-gray-300">
-          <div className="font-bold text-base tracking-wide">DADDY'S SIZZLERS</div>
-          <div className="text-[10px] text-gray-600">123 Rizal St, Metro Manila</div>
-          <div className="text-[10px] text-gray-600">+63 917 123 4567</div>
+          <div className="font-bold text-base tracking-wide">{(shop?.restaurant_name || "Daddy's Sizzlers").toUpperCase()}</div>
+          {shop?.address && <div className="text-[10px] text-gray-600">{shop.address}</div>}
+          {shop?.phone && <div className="text-[10px] text-gray-600">{shop.phone}</div>}
         </div>
         <div className="p-5 space-y-1">
           <div className="flex justify-between"><span>Order #</span><span className="font-bold">{order.order_number}</span></div>
@@ -302,8 +313,9 @@ function ReceiptModal({ order, onClose }) {
           <div className="flex justify-between"><span>Type</span><span>{ORDER_TYPES[order.order_type]} {order.table_number ? `· Tbl ${order.table_number}` : ""}</span></div>
           <div className="border-t border-dashed border-gray-300 my-2" />
           {order.items.map((i,idx) => (
-            <div key={idx} className="flex justify-between">
-              <span>{i.quantity}× {i.name}</span><span>{formatPeso(i.subtotal)}</span>
+            <div key={idx}>
+              <div className="flex justify-between"><span>{i.quantity}× {i.name}</span><span>{formatPeso(i.subtotal)}</span></div>
+              {i.addons?.length > 0 && <div className="pl-4 text-[10px] text-gray-600">+ {addonsText(i)}</div>}
             </div>
           ))}
           <div className="border-t border-dashed border-gray-300 my-2" />

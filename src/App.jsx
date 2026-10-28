@@ -9,6 +9,9 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
 import Landing from '@/pages/Landing';
 import Order from '@/pages/Order';
+import Track from '@/pages/Track';
+import Privacy from '@/pages/Privacy';
+import RoleGate from '@/components/RoleGate';
 import Dashboard from '@/pages/Dashboard';
 import POS from '@/pages/POS';
 import Orders from '@/pages/Orders';
@@ -54,26 +57,29 @@ const AuthenticatedApp = () => {
 
       <Route path="/" element={<Landing />} />
       <Route path="/order" element={<Order />} />
+      <Route path="/track" element={<Track />} />
+      <Route path="/track/:id" element={<Track />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<RoleGate><Dashboard /></RoleGate>} />
           <Route path="pos" element={<POS />} />
           <Route path="orders" element={<Orders />} />
           <Route path="tables" element={<Tables />} />
           <Route path="kitchen" element={<Kitchen />} />
-          <Route path="menu" element={<MenuManagement />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="suppliers" element={<Suppliers />} />
-          <Route path="expenses" element={<Expenses />} />
+          <Route path="menu" element={<RoleGate><MenuManagement /></RoleGate>} />
+          <Route path="inventory" element={<RoleGate><Inventory /></RoleGate>} />
+          <Route path="suppliers" element={<RoleGate><Suppliers /></RoleGate>} />
+          <Route path="expenses" element={<RoleGate><Expenses /></RoleGate>} />
           <Route path="customers" element={<Customers />} />
-          <Route path="promotions" element={<Promotions />} />
-          <Route path="discounts" element={<Discounts />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="promotions" element={<RoleGate><Promotions /></RoleGate>} />
+          <Route path="discounts" element={<RoleGate><Discounts /></RoleGate>} />
+          <Route path="reports" element={<RoleGate><Reports /></RoleGate>} />
           <Route path="shifts" element={<CashierShifts />} />
-          <Route path="users" element={<Users />} />
-          <Route path="audit" element={<AuditLogs />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="users" element={<RoleGate><Users /></RoleGate>} />
+          <Route path="audit" element={<RoleGate><AuditLogs /></RoleGate>} />
+          <Route path="settings" element={<RoleGate><Settings /></RoleGate>} />
         </Route>
       </Route>
 

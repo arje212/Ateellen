@@ -87,3 +87,31 @@ export const TABLE_STATUS_COLORS = {
 export function foodImage(seed) {
   return `https://images.unsplash.com/photo-${seed}?auto=format&fit=crop&w=600&q=70`;
 }
+// ---- Add-ons (extra rice, etc.) ---------------------------------------------
+// A cart/order line looks like: { name, price (unit price INCLUDING add-ons), quantity,
+//   variant, addons: [{ id, name, price, quantity }] }
+export function addonsText(item) {
+  const list = item?.addons || [];
+  return list.map(a => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""}`).join(", ");
+}
+
+export function addonsTotal(addons = []) {
+  return addons.reduce((s, a) => s + (Number(a.price) || 0) * (a.quantity || 0), 0);
+}
+
+// Build a cart line (same product + variant + add-ons merges into one line)
+export function buildCartLine(product, variant, addons = [], quantity = 1) {
+  const chosen = addons.filter(a => a.quantity > 0).map(a => ({ id: a.id, name: a.name, price: Number(a.price) || 0, quantity: a.quantity }));
+  const base = variant ? variant.price : product.price;
+  const key = [product.id, variant?.name || "", chosen.map(a => `${a.id}x${a.quantity}`).join("+")].join("|");
+  return {
+    key,
+    product_id: product.id,
+    name: variant ? `${product.name} (${variant.name})` : product.name,
+    price: (Number(base) || 0) + addonsTotal(chosen),
+    quantity,
+    variant: variant?.name || "",
+    addons: chosen,
+    notes: "",
+  };
+}

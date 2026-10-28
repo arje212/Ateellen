@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { db } from "@/api/db";
 import { useAuth } from "@/lib/AuthContext";
-import { Search, Eye, Printer, Ban, RotateCcw, X } from "lucide-react";
+import { Search, Eye, Printer, Ban, RotateCcw, X, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { formatPeso, formatDateTime, ORDER_TYPES, PAYMENT_METHODS, ORDER_STATUSES, STATUS_COLORS } from "@/lib/restaurant";
+import { formatPeso, formatDateTime, ORDER_TYPES, PAYMENT_METHODS, ORDER_STATUSES, STATUS_COLORS, addonsText } from "@/lib/restaurant";
 import { cn } from "@/lib/utils";
 
 export default function Orders() {
@@ -35,8 +35,16 @@ export default function Orders() {
 
   const updateStatus = async (order, status) => {
     const verb = status === "cancelled" ? "cancel" : status === "completed" ? "complete" : "update";
-    if (!confirm(`Are you sure you want to ${verb} ${order.order_number}?`)) return;
-    await db.entities.Order.update(order.id, { status });
+    let reason = "";
+    if (status === "cancelled") {
+      // the customer sees this reason on their tracking page
+      const r = window.prompt(`Cancel ${order.order_number}?\nReason (shown to the customer):`, "Out of stock");
+      if (r === null) return;
+      reason = r.trim();
+    } else if (!confirm(`Are you sure you want to ${verb} ${order.order_number}?`)) return;
+    try {
+      await db.entities.Order.update(order.id, status === "cancelled" ? { status, cancel_reason: reason } : { status });
+    } catch (e) { return toast({ title: "Failed", description: e.message, variant: "destructive" }); }
     if (status === "completed" && order.table_number) {
       const t = await db.entities.RestaurantTable.filter({ table_number: order.table_number }, { limit: 1 });
       if (t.items[0]) await db.entities.RestaurantTable.update(t.items[0].id, { status: "cleaning", current_order_id: "", current_order_number: "", current_amount: 0 });
@@ -44,6 +52,18 @@ export default function Orders() {
     await db.entities.AuditLog.create({ user_name: user?.full_name, action: `${verb}_order`, module: "Orders", description: `${order.order_number} → ${status}` });
     toast({ title: `${order.order_number} ${ORDER_STATUSES[status]}` });
     load();
+  };
+
+  const markPaid = async (order) => {
+    const ref = order.payment_reference ? ` (ref ${order.payment_reference})` : "";
+    if (!confirm(`Mark ${order.order_number} as PAID — ${formatPeso(order.total)}${ref}?`)) return;
+    try {
+      await db.entities.Order.update(order.id, { payment_status: "paid", amount_paid: order.total });
+      await db.entities.AuditLog.create({ user_name: user?.full_name, action: "mark_paid", module: "Orders", description: `${order.order_number} paid via ${PAYMENT_METHODS[order.payment_method]}${ref}` });
+      toast({ title: `${order.order_number} marked as paid` });
+      setViewing(v => (v && v.id === order.id ? { ...v, payment_status: "paid", amount_paid: order.total } : v));
+      load();
+    } catch (e) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
   };
 
   const refund = async (order) => {
@@ -104,6 +124,7 @@ export default function Orders() {
                     <div className="flex justify-end gap-1">
                       <button onClick={() => setViewing(o)} className="p-1.5 rounded-lg hover:bg-secondary" title="View"><Eye className="w-4 h-4" /></button>
                       <button onClick={() => window.print()} className="p-1.5 rounded-lg hover:bg-secondary" title="Print"><Printer className="w-4 h-4" /></button>
+                      {o.payment_status === "unpaid" && o.status !== "cancelled" && <button onClick={() => markPaid(o)} className="p-1.5 rounded-lg hover:bg-secondary text-emerald-400" title="Mark as paid"><BadgeCheck className="w-4 h-4" /></button>}
                       {o.payment_status === "paid" && <button onClick={() => refund(o)} className="p-1.5 rounded-lg hover:bg-secondary text-accent" title="Refund"><RotateCcw className="w-4 h-4" /></button>}
                       {o.status !== "completed" && o.status !== "cancelled" && <button onClick={() => updateStatus(o, "cancelled")} className="p-1.5 rounded-lg hover:bg-secondary text-destructive" title="Cancel"><Ban className="w-4 h-4" /></button>}
                     </div>
@@ -116,12 +137,12 @@ export default function Orders() {
         </div>
       </div>
 
-      {viewing && <OrderDetail order={viewing} onClose={() => setViewing(null)} onComplete={(s) => updateStatus(viewing, s)} />}
+      {viewing && <OrderDetail order={viewing} onClose={() => setViewing(null)} onComplete={(s) => updateStatus(viewing, s)} onPaid={() => markPaid(viewing)} />}
     </div>
   );
 }
 
-function OrderDetail({ order, onClose, onComplete }) {
+function OrderDetail({ order, onClose, onComplete, onPaid }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
@@ -138,17 +159,25 @@ function OrderDetail({ order, onClose, onComplete }) {
             <Info label="Customer" value={order.customer_name || "—"} />
             <Info label="Cashier" value={order.cashier_name || "—"} />
             <Info label="Payment" value={`${PAYMENT_METHODS[order.payment_method]} · ${order.payment_status}`} />
+            {order.customer_phone && <Info label="Phone" value={order.customer_phone} />}
+            {order.payment_reference && <Info label="Payment ref #" value={order.payment_reference} />}
+            {order.source === "online" && <Info label="Source" value="Online order" />}
           </div>
+          {order.delivery_address && <div className="text-sm bg-secondary rounded-lg px-3 py-2">📍 {order.delivery_address}</div>}
+          {order.status === "cancelled" && order.cancel_reason && <div className="text-sm bg-destructive/10 text-destructive rounded-lg px-3 py-2">Cancelled: {order.cancel_reason}</div>}
           <div className="border border-border rounded-xl divide-y divide-border">
             {order.items?.map((i,idx) => (
               <div key={idx} className="flex justify-between px-4 py-2.5 text-sm">
-                <span>{i.quantity}× {i.name}{i.variant?` (${i.variant})`:""}</span>
+                <span>{i.quantity}× {i.name}{i.variant?` (${i.variant})`:""}
+                  {i.addons?.length > 0 && <span className="block text-xs text-accent">+ {addonsText(i)}</span>}
+                </span>
                 <span className="font-600">{formatPeso(i.subtotal)}</span>
               </div>
             ))}
           </div>
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatPeso(order.subtotal)}</span></div>
+            {order.delivery_fee > 0 && <div className="flex justify-between text-muted-foreground"><span>Delivery fee</span><span>{formatPeso(order.delivery_fee)}</span></div>}
             {order.discount_amount > 0 && <div className="flex justify-between text-accent"><span>Discount ({order.discount_name})</span><span>-{formatPeso(order.discount_amount)}</span></div>}
             <div className="flex justify-between text-lg font-700 pt-1 border-t border-border"><span>Total</span><span className="text-primary">{formatPeso(order.total)}</span></div>
             <div className="flex justify-between text-muted-foreground"><span>Paid</span><span>{formatPeso(order.amount_paid)}</span></div>
@@ -156,7 +185,8 @@ function OrderDetail({ order, onClose, onComplete }) {
           </div>
           {order.notes && <div className="text-sm bg-accent/10 rounded-lg px-3 py-2">📝 {order.notes}</div>}
           <div className="flex gap-2">
-            {order.status !== "completed" && <Button className="flex-1" onClick={() => onComplete("completed")}>Mark Completed</Button>}
+            {order.payment_status === "unpaid" && order.status !== "cancelled" && <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white" onClick={onPaid}>Mark as Paid</Button>}
+            {order.status !== "completed" && order.status !== "cancelled" && <Button className="flex-1" variant={order.payment_status === "unpaid" ? "outline" : "default"} onClick={() => onComplete("completed")}>Mark Completed</Button>}
             <Button variant="outline" onClick={() => window.print()} className="gap-1"><Printer className="w-4 h-4" /> Print</Button>
           </div>
         </div>

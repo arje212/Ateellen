@@ -21,6 +21,7 @@ const TABLES = {
     cols: {
       name: 'text', category_id: 'text', category_name: 'text', description: 'text', price: 'numnull',
       variants: 'json', image_url: 'text', active: 'bool', sort_order: 'num', serves_with: 'text',
+      sold_out: 'bool', recipe: 'json',
     },
   },
   AppSetting: {
@@ -28,6 +29,9 @@ const TABLES = {
     cols: {
       restaurant_name: 'text', logo_url: 'text', address: 'text', phone: 'text', email: 'text',
       facebook_page: 'text', business_hours: 'text', currency: 'text', timezone: 'text',
+      online_ordering_enabled: 'bool', auto_schedule: 'bool', open_time: 'text', close_time: 'text', closed_message: 'text',
+      estimated_time: 'text', delivery_fee: 'num', free_delivery_over: 'num', min_order_amount: 'num', delivery_areas: 'text',
+      gcash_number: 'text', gcash_name: 'text', gcash_qr_url: 'text', maya_number: 'text', maya_name: 'text',
     },
   },
   RestaurantTable: {
@@ -46,7 +50,12 @@ const TABLES = {
       subtotal: 'num', discount_id: 'text', discount_name: 'text', discount_amount: 'num', total: 'num',
       payment_method: 'text', amount_paid: 'num', change: 'num', payment_status: 'text', cashier_id: 'text',
       cashier_name: 'text', source: 'text',
+      delivery_fee: 'num', payment_reference: 'text', cancel_reason: 'text', privacy_consent: 'bool',
     },
+  },
+  Addon: {
+    table: 'addons',
+    cols: { name: 'text', price: 'num', active: 'bool', sort_order: 'num', category_ids: 'json' },
   },
   Customer: {
     table: 'customers',

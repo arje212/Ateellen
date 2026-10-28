@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "@/api/db";
-import { Search, Plus, Minus, ShoppingCart, X, Trash2, ArrowLeft, Flame, Leaf, Check, Clock } from "lucide-react";
+import { Search, Plus, Minus, ShoppingCart, X, Trash2, ArrowLeft, Flame, Check, Clock, Truck, AlertTriangle } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { formatPeso, generateOrderNumber, ORDER_TYPES } from "@/lib/restaurant";
+import { formatPeso, ORDER_TYPES, addonsText, buildCartLine } from "@/lib/restaurant";
+import ProductOptionsModal from "@/components/ProductOptionsModal";
 import { MENU_CATEGORIES, MENU_PRODUCTS } from "@/lib/menuData";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -27,6 +28,22 @@ export default function Order() {
   const [tableNumber, setTableNumber] = useState("");
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "", notes: "" });
   const [activeProduct, setActiveProduct] = useState(null);
+  const [addons, setAddons] = useState([]);
+  const [shop, setShop] = useState(null);          // app_settings (fees, GCash number, closed message…)
+  const [isOpen, setIsOpen] = useState(true);       // from the server (hours + on/off switch)
+  const [payMethod, setPayMethod] = useState("cash");
+  const [payRef, setPayRef] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [website, setWebsite] = useState("");       // honeypot: real people never fill this
+  const [lastOrderId, setLastOrderId] = useState(() => { try { return localStorage.getItem("last_order_id") || ""; } catch { return ""; } });
+
+  // is the shop open right now? (server decides: on/off switch + opening hours)
+  useEffect(() => {
+    const check = () => db.rpc("is_ordering_open").then(setIsOpen).catch(() => {});
+    check();
+    const t = setInterval(check, 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -34,7 +51,10 @@ export default function Order() {
     Promise.allSettled([
       db.entities.Category.list({ sort: "sort_order", limit: 50 }),
       db.entities.Product.filter({ active: true }, { sort: "sort_order", limit: 200 }),
-    ]).then(([categoryResult, productResult]) => {
+      db.entities.Addon.filter({ active: true }, { sort: "sort_order", limit: 50 }),
+      db.entities.AppSetting.list({ limit: 1 }),
+    ]).then(([categoryResult, productResult, addonResult, settingsResult]) => {
+      if (settingsResult.status === "fulfilled") setShop((settingsResult.value.items || [])[0] || null);
       if (!active) return;
       if (categoryResult.status === "fulfilled" && categoryResult.value.items?.length) {
         setCategories(categoryResult.value.items);
@@ -42,6 +62,7 @@ export default function Order() {
       if (productResult.status === "fulfilled" && productResult.value.items?.length) {
         setProducts(productResult.value.items);
       }
+      if (addonResult.status === "fulfilled") setAddons(addonResult.value.items || []);
     });
 
     return () => { active = false; };
@@ -55,20 +76,23 @@ export default function Order() {
     });
   }, [products, activeCat, search]);
 
-  const addToCart = (product, variant = null, qty = 1) => {
-    const key = product.id + (variant ? `-${variant.name}` : "");
-    const price = variant ? variant.price : product.price;
-    const name = variant ? `${product.name} (${variant.name})` : product.name;
+  // line = ready-made cart line from ProductOptionsModal / quick add
+  const addLine = (line) => {
     setCart(prev => {
-      const existing = prev.find(i => i.key === key);
-      if (existing) {
-        return prev.map(i => i.key === key ? { ...i, quantity: i.quantity + qty } : i);
-      }
-      return [...prev, { key, product_id: product.id, name, price, quantity: qty, variant: variant?.name || "", notes: "" }];
+      const existing = prev.find(i => i.key === line.key);
+      if (existing) return prev.map(i => i.key === line.key ? { ...i, quantity: i.quantity + line.quantity } : i);
+      return [...prev, line];
     });
     setActiveProduct(null);
-    toast({ title: "Added to cart", description: name });
+    toast({ title: "Added to cart", description: line.name });
   };
+
+  const addonsFor = (product) =>
+    addons.filter(a => !a.category_ids?.length || a.category_ids.includes(product.category_id));
+
+  // dishes with sizes or available add-ons open the options sheet; others add straight away
+  const needsOptions = (p) => (p.variants?.length > 0) || addonsFor(p).length > 0;
+  const quickAdd = (p) => (needsOptions(p) ? setActiveProduct(p) : addLine(buildCartLine(p, null, [], 1)));
 
   const updateQty = (key, delta) => {
     setCart(prev => prev.map(i => i.key === key ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
@@ -77,32 +101,32 @@ export default function Order() {
   const removeItem = (key) => setCart(prev => prev.filter(i => i.key !== key));
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const total = subtotal;
+  const deliveryFee = orderType === "delivery" && cart.length > 0
+    && !(Number(shop?.free_delivery_over) > 0 && subtotal >= Number(shop.free_delivery_over))
+    ? Number(shop?.delivery_fee) || 0 : 0;
+  const total = subtotal + deliveryFee;
+  const minOrder = Number(shop?.min_order_amount) || 0;
+  const hasGcash = !!shop?.gcash_number;
+  const hasMaya = !!shop?.maya_number;
+  const payInfo = payMethod === "gcash" ? { number: shop?.gcash_number, name: shop?.gcash_name } : payMethod === "maya" ? { number: shop?.maya_number, name: shop?.maya_name } : null;
 
   const handlePlace = async () => {
+    if (website) return; // honeypot filled → bot, silently ignore
+    if (!isOpen) return toast({ title: "We're closed", description: shop?.closed_message || "Online ordering is not available right now.", variant: "destructive" });
     if (cart.length === 0) return toast({ title: "Cart is empty", variant: "destructive" });
+    if (minOrder > 0 && subtotal < minOrder) return toast({ title: `Minimum order is ${formatPeso(minOrder)}`, variant: "destructive" });
     if (orderType === "dine_in" && !tableNumber) return toast({ title: "Select a table number", variant: "destructive" });
     if (orderType !== "dine_in" && !customer.name) return toast({ title: "Customer name required", variant: "destructive" });
+    if (orderType !== "dine_in" && customer.phone.replace(/\D/g, "").length < 7) return toast({ title: "Contact number required", description: "We use it so you can track your order.", variant: "destructive" });
     if (orderType === "delivery" && !customer.address) return toast({ title: "Delivery address required", variant: "destructive" });
+    if (payMethod !== "cash" && payRef.trim().length < 4) return toast({ title: "Enter your payment reference number", description: "Pay first, then type the reference number from your GCash/Maya receipt.", variant: "destructive" });
+    if (!consent) return toast({ title: "Please agree to the Privacy Notice", variant: "destructive" });
 
     setPlacing(true);
     try {
-      const today = new Date();
-      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
-
-      // Visitors can't read the orders table (privacy), so count through a DB function.
-      let count = 0;
-      try {
-        count = await db.rpc("count_orders_with_prefix", { prefix: `ORD-${ymd}` });
-      } catch {
-        // If counting fails for any reason, fall back to a time-based sequence
-        // so the order can still be placed.
-        count = Math.floor(Date.now() / 1000) % 10000;
-      }
-      const order_number = generateOrderNumber(count);
-
-      const order = await db.entities.Order.create({
-        order_number,
+      // The server re-prices the cart, adds the delivery fee and assigns the real order number.
+      const draft = await db.entities.Order.create({
+        order_number: "NEW",
         order_type: orderType,
         status: "new",
         table_number: orderType === "dine_in" ? tableNumber : "",
@@ -113,17 +137,20 @@ export default function Order() {
         notes: customer.notes,
         items: cart.map(i => ({ ...i, subtotal: i.price * i.quantity })),
         subtotal,
+        delivery_fee: deliveryFee,
         total,
+        payment_method: payMethod,
+        payment_reference: payMethod === "cash" ? "" : payRef.trim(),
         payment_status: "unpaid",
+        privacy_consent: true,
         source: "online",
       });
-      await db.entities.AppNotification.create({
-        type: "new_order",
-        title: "New online order",
-        message: `${order_number} placed by ${customer.name || "Table " + tableNumber}`,
-        module: "kitchen",
-        related_id: order.id,
-      });
+      let order = draft;
+      try {
+        const real = await db.rpc("track_order", { p_id: draft.id });
+        if (real) order = { ...draft, ...real };
+      } catch { /* keep the local copy */ }
+      try { localStorage.setItem("last_order_id", order.id); setLastOrderId(order.id); } catch { /* ignore */ }
       setPlacedOrder(order);
       setCart([]);
       setCartOpen(false);
@@ -152,6 +179,9 @@ export default function Order() {
             <div className="flex justify-between"><span className="text-muted-foreground">Estimated time</span><span className="font-600 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> 15–25 mins</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><span className="font-700 text-primary">{formatPeso(placedOrder.total)}</span></div>
           </div>
+          <Link to={`/track/${placedOrder.id}`}>
+            <Button className="w-full mb-3 gap-2"><Truck className="w-4 h-4" /> Track my order</Button>
+          </Link>
           <div className="flex gap-3">
             <Link to="/" className="flex-1"><Button variant="outline" className="w-full">Home</Button></Link>
             <Button className="flex-1" onClick={() => { setPlacedOrder(null); setOrderType("dine_in"); setTableNumber(""); setCustomer({ name: "", phone: "", address: "", notes: "" }); }}>Order Again</Button>
@@ -170,7 +200,8 @@ export default function Order() {
             <Flame className="w-5 h-5 text-primary" />
             <span className="font-display font-700 tracking-wide">ORDER ONLINE</span>
           </div>
-          <button onClick={() => setCartOpen(true)} className="ml-auto relative p-2.5 rounded-xl bg-primary text-primary-foreground">
+          <Link to={lastOrderId ? `/track/${lastOrderId}` : "/track"} className="ml-auto text-xs font-600 text-primary border border-primary/30 rounded-lg px-3 py-2 flex items-center gap-1.5"><Truck className="w-4 h-4" /> Track order</Link>
+          <button onClick={() => setCartOpen(true)} className="relative p-2.5 rounded-xl bg-primary text-primary-foreground">
             <ShoppingCart className="w-5 h-5" />
             {cart.length > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-700 flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}
           </button>
@@ -186,6 +217,15 @@ export default function Order() {
           {categories.map(c => <CatChip key={c.id} active={activeCat===c.id} onClick={() => setActiveCat(c.id)} label={c.name} />)}
         </div>
       </header>
+      {!isOpen && (
+        <div className="bg-destructive/15 border-b border-destructive/30">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex items-start gap-3 text-sm">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div><b className="text-destructive">We're not accepting online orders right now.</b>
+              <div className="text-muted-foreground">{shop?.closed_message || "You can still look at the menu. Please come back later!"}</div></div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-5">
         {loading ? (
@@ -196,7 +236,8 @@ export default function Order() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {filtered.map(p => (
               <div key={p.id} className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/40 transition-colors">
-                <button className="block w-full aspect-[4/3] bg-secondary relative" onClick={() => setActiveProduct(p)}>
+                <button className="block w-full aspect-[4/3] bg-secondary relative" disabled={p.sold_out} onClick={() => setActiveProduct(p)}>
+                  {p.sold_out && <div className="absolute inset-0 z-10 bg-background/75 flex items-center justify-center"><span className="bg-destructive text-destructive-foreground text-xs font-700 uppercase tracking-wider px-3 py-1.5 rounded-full">Sold out</span></div>}
                   {p.image_url ? <Image src={p.image_url} alt={p.name} className="w-full h-full" fittingType="fill" /> :
                     <div className="w-full h-full flex items-center justify-center"><Flame className="w-10 h-10 text-primary/30" /></div>}
                 </button>
@@ -205,12 +246,14 @@ export default function Order() {
                   <div className="text-xs text-muted-foreground line-clamp-1 mb-2">{p.description || p.category_name}</div>
                   <div className="flex items-center justify-between">
                     <span className="text-primary font-700 text-sm">{p.price == null ? "Ask for price" : formatPeso(p.price)}</span>
-                    {p.price == null ? (
+                    {p.sold_out ? (
+                      <span className="text-xs text-destructive font-600">Sold out</span>
+                    ) : p.price == null ? (
                       <span className="text-xs text-muted-foreground">Ask in store</span>
-                    ) : p.variants && p.variants.length > 0 ? (
+                    ) : needsOptions(p) ? (
                       <button onClick={() => setActiveProduct(p)} className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg font-600">Choose</button>
                     ) : (
-                      <button onClick={() => addToCart(p)} className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-600 flex items-center gap-1"><Plus className="w-3 h-3" />Add</button>
+                      <button onClick={() => quickAdd(p)} className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-600 flex items-center gap-1"><Plus className="w-3 h-3" />Add</button>
                     )}
                   </div>
                 </div>
@@ -221,41 +264,9 @@ export default function Order() {
         {filtered.length === 0 && !loading && <div className="text-center py-20 text-muted-foreground">No dishes found.</div>}
       </div>
 
-      {/* Product modal */}
+      {/* Product options (size + add-ons + qty) */}
       {activeProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setActiveProduct(null)}>
-          <div className="bg-card w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="aspect-[16/10] bg-secondary relative">
-              {activeProduct.image_url ? <Image src={activeProduct.image_url} alt={activeProduct.name} className="w-full h-full" fittingType="fill" /> :
-                <div className="w-full h-full flex items-center justify-center"><Flame className="w-16 h-16 text-primary/30" /></div>}
-              <button onClick={() => setActiveProduct(null)} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-5">
-              <h3 className="font-display font-700 text-xl uppercase">{activeProduct.name}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{activeProduct.description || activeProduct.serves_with}</p>
-              {activeProduct.variants && activeProduct.variants.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-xs font-600 uppercase tracking-wide text-muted-foreground mb-2">Choose size</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {activeProduct.variants.map(v => (
-                      <button key={v.name} onClick={() => addToCart(activeProduct, v)} className="border border-border rounded-xl p-3 text-left hover:border-primary hover:bg-primary/5 transition-colors">
-                        <div className="font-600 text-sm">{v.name}</div>
-                        <div className="text-primary font-700">{formatPeso(v.price)}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {activeProduct.price == null ? (
-                <p className="mt-4 text-sm text-muted-foreground">Please ask in store for current pricing.</p>
-              ) : (!activeProduct.variants || activeProduct.variants.length === 0) && (
-                <Button className="w-full mt-5" onClick={() => addToCart(activeProduct)}>
-                  <Plus className="w-4 h-4" /> Add to cart — {formatPeso(activeProduct.price)}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ProductOptionsModal product={activeProduct} addons={addonsFor(activeProduct)} onAdd={addLine} onClose={() => setActiveProduct(null)} />
       )}
 
       {/* Cart drawer */}
@@ -272,6 +283,7 @@ export default function Order() {
                 <div key={i.key} className="flex items-center gap-3 bg-secondary/30 rounded-xl p-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-600 text-sm truncate">{i.name}</div>
+                    {i.addons?.length > 0 && <div className="text-xs text-muted-foreground truncate">+ {addonsText(i)}</div>}
                     <div className="text-primary font-700 text-sm">{formatPeso(i.price)}</div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -302,7 +314,7 @@ export default function Order() {
                 {orderType !== "dine_in" && (
                   <div className="space-y-2">
                     <div><Label className="text-xs">Name</Label><Input value={customer.name} onChange={e => setCustomer({...customer, name: e.target.value})} className="mt-1" /></div>
-                    <div><Label className="text-xs">Contact</Label><Input value={customer.phone} onChange={e => setCustomer({...customer, phone: e.target.value})} className="mt-1" /></div>
+                    <div><Label className="text-xs">Contact number</Label><Input value={customer.phone} onChange={e => setCustomer({...customer, phone: e.target.value})} className="mt-1" /></div>
                     {orderType === "delivery" && (
                       <>
                         <div><Label className="text-xs">Address</Label><Textarea value={customer.address} onChange={e => setCustomer({...customer, address: e.target.value})} className="mt-1" rows={2} /></div>
@@ -311,12 +323,48 @@ export default function Order() {
                     )}
                   </div>
                 )}
-                <div className="flex justify-between items-center pt-2 border-t border-border">
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="font-display font-700 text-2xl text-primary">{formatPeso(total)}</span>
+                {orderType === "delivery" && shop?.delivery_areas && (
+                  <div className="text-xs text-muted-foreground bg-secondary rounded-lg px-3 py-2">🛵 We deliver to: {shop.delivery_areas}</div>
+                )}
+
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Payment</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {[["cash", "Cash"], ...(hasGcash ? [["gcash", "GCash"]] : []), ...(hasMaya ? [["maya", "Maya"]] : [])].map(([k, v]) => (
+                      <button key={k} onClick={() => setPayMethod(k)} className={cn("py-2 rounded-lg text-xs font-600 border transition-colors", payMethod === k ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40")}>{v}</button>
+                    ))}
+                  </div>
+                  {payMethod === "cash" && <p className="text-xs text-muted-foreground mt-2">{orderType === "delivery" ? "Pay cash to the rider on delivery." : "Pay at the counter."}</p>}
+                  {payInfo && (
+                    <div className="mt-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+                      <div>Send <b className="text-primary">{formatPeso(total)}</b> to <b>{payInfo.number}</b>{payInfo.name ? ` (${payInfo.name})` : ""}</div>
+                      {payMethod === "gcash" && shop?.gcash_qr_url && <img src={shop.gcash_qr_url} alt="GCash QR" className="w-40 h-40 object-contain rounded-lg bg-white mx-auto" />}
+                      <div><Label className="text-xs">Reference number</Label><Input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="From your payment receipt" className="mt-1" /></div>
+                      <p className="text-[11px] text-muted-foreground">We confirm your payment before preparing your order.</p>
+                    </div>
+                  )}
                 </div>
-                <Button className="w-full" disabled={placing} onClick={handlePlace}>
-                  {placing ? "Placing..." : "Place Order"}
+
+                {/* honeypot (hidden from people) */}
+                <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={e => setWebsite(e.target.value)} className="hidden" aria-hidden="true" name="website" />
+
+                <div className="space-y-1 pt-2 border-t border-border text-sm">
+                  <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatPeso(subtotal)}</span></div>
+                  {orderType === "delivery" && <div className="flex justify-between text-muted-foreground"><span>Delivery fee</span><span>{deliveryFee > 0 ? formatPeso(deliveryFee) : "Free"}</span></div>}
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-display font-700 text-2xl text-primary">{formatPeso(total)}</span>
+                  </div>
+                  {minOrder > 0 && subtotal < minOrder && <div className="text-xs text-destructive">Minimum order is {formatPeso(minOrder)} — add {formatPeso(minOrder - subtotal)} more.</div>}
+                </div>
+
+                <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5" />
+                  <span>I agree to the <Link to="/privacy" target="_blank" className="text-primary underline">Privacy Notice</Link> and allow you to use my name, number and address to process this order.</span>
+                </label>
+
+                <Button className="w-full" disabled={placing || !isOpen} onClick={handlePlace}>
+                  {!isOpen ? "Currently closed" : placing ? "Placing..." : "Place Order"}
                 </Button>
               </div>
             )}

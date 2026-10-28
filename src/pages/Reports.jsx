@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { db } from "@/api/db";
-import { Download, TrendingUp, BarChart3, FileText } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from "recharts";
-import { formatPeso, formatDateTime, ORDER_TYPES, PAYMENT_METHODS, ORDER_STATUSES } from "@/lib/restaurant";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { formatPeso, formatDateTime, PAYMENT_METHODS } from "@/lib/restaurant";
 
 export default function Reports() {
   const [tab, setTab] = useState("sales");

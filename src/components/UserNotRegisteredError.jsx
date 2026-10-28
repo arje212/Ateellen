@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 
 const UserNotRegisteredError = ({
   title = 'Waiting for approval',
-  message = 'Your account has been created, but an administrator still needs to approve it before you can use the dashboard.',
+  message = 'This dashboard is for approved staff only. An admin needs to approve your account first.',
 }) => {
   const { logout, user } = useAuth();
   return (

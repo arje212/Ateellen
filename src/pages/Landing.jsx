@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { db } from "@/api/db";
-import { Flame, Leaf, Star, Clock, MapPin, Phone, Facebook, ArrowRight, UtensilsCrossed, Truck, ShieldCheck } from "lucide-react";
+import { Flame, Leaf, Star, Clock, MapPin, Phone, Facebook, ArrowRight, Truck, ShieldCheck } from "lucide-react";
 import { foodImage, formatPeso } from "@/lib/restaurant";
 import { MENU_CATEGORIES, MENU_PRODUCTS } from "@/lib/menuData";
 import { Image } from "@/components/ui/image";
@@ -53,6 +53,7 @@ export default function Landing() {
             <a href="#menu" className="hover:text-primary transition-colors">Menu</a>
             <a href="#about" className="hover:text-primary transition-colors">About</a>
             <a href="#contact" className="hover:text-primary transition-colors">Contact</a>
+            <Link to="/track" className="hover:text-primary transition-colors">Track Order</Link>
           </nav>
           <Link to="/order" className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-600 px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-opacity">
             Order Now <ArrowRight className="w-4 h-4" />
@@ -173,6 +174,7 @@ export default function Landing() {
               <span className="font-display font-700 tracking-wide">DADDYSKITCHENETTE</span>
             </div>
             <p className="text-sm text-muted-foreground">Sizzling goodness made for you. Authentic Filipino comfort food, served hot and bold.</p>
+            <Link to="/privacy" className="inline-block mt-3 text-xs text-muted-foreground underline hover:text-primary">Privacy Notice</Link>
           </div>
           <div>
             <div className="font-600 mb-3 text-sm uppercase tracking-wide text-muted-foreground">Visit Us</div>

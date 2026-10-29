@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { formatPeso } from "@/lib/restaurant";
 import { Image } from "@/components/ui/image";
+import ImageUploader from "@/components/ImageUploader";
 
 export default function MenuManagement() {
   const { toast } = useToast();
@@ -165,7 +166,7 @@ function ProductForm({ product, categories, onClose, onSaved }) {
           </div>
           <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} className="mt-1" /></div>
           <div><Label>Served with</Label><Input value={form.serves_with} onChange={e => setForm({...form, serves_with: e.target.value})} placeholder="e.g. 2 rice + 1 iced tea" className="mt-1" /></div>
-          <div><Label>Image URL</Label><Input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://..." className="mt-1" /></div>
+          <div><Label>Picture</Label><div className="mt-1"><ImageUploader value={form.image_url} onChange={url => setForm({ ...form, image_url: url })} folder="products" /></div></div>
           <div>
             <Label>Variants (size/price)</Label>
             <div className="space-y-2 mt-1">

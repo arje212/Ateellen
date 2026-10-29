@@ -5,7 +5,7 @@ import { Search, Eye, Printer, Ban, RotateCcw, X, BadgeCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { formatPeso, formatDateTime, ORDER_TYPES, PAYMENT_METHODS, ORDER_STATUSES, STATUS_COLORS, addonsText } from "@/lib/restaurant";
+import { formatPeso, formatDateTime, ORDER_TYPES, PAYMENT_METHODS, ORDER_STATUSES, STATUS_COLORS, addonsText, formatPickup } from "@/lib/restaurant";
 import { cn } from "@/lib/utils";
 
 export default function Orders() {
@@ -159,6 +159,7 @@ function OrderDetail({ order, onClose, onComplete, onPaid }) {
             <Info label="Customer" value={order.customer_name || "—"} />
             <Info label="Cashier" value={order.cashier_name || "—"} />
             <Info label="Payment" value={`${PAYMENT_METHODS[order.payment_method]} · ${order.payment_status}`} />
+            {order.pickup_time && <Info label="Pickup time" value={formatPickup(order.pickup_time)} />}
             {order.customer_phone && <Info label="Phone" value={order.customer_phone} />}
             {order.payment_reference && <Info label="Payment ref #" value={order.payment_reference} />}
             {order.source === "online" && <Info label="Source" value="Online order" />}

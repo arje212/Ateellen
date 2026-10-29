@@ -50,7 +50,7 @@ const TABLES = {
       subtotal: 'num', discount_id: 'text', discount_name: 'text', discount_amount: 'num', total: 'num',
       payment_method: 'text', amount_paid: 'num', change: 'num', payment_status: 'text', cashier_id: 'text',
       cashier_name: 'text', source: 'text',
-      delivery_fee: 'num', payment_reference: 'text', cancel_reason: 'text', privacy_consent: 'bool',
+      delivery_fee: 'num', payment_reference: 'text', cancel_reason: 'text', privacy_consent: 'bool', pickup_time: 'ts',
     },
   },
   Addon: {

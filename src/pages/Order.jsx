@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { formatPeso, ORDER_TYPES, addonsText, buildCartLine } from "@/lib/restaurant";
+import { formatPeso, ORDER_TYPES, addonsText, buildCartLine, formatPickup, buildPickupSlots } from "@/lib/restaurant";
 import ProductOptionsModal from "@/components/ProductOptionsModal";
 import { MENU_CATEGORIES, MENU_PRODUCTS } from "@/lib/menuData";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,8 @@ export default function Order() {
   const [payMethod, setPayMethod] = useState("cash");
   const [payRef, setPayRef] = useState("");
   const [consent, setConsent] = useState(false);
+  const [pickupMode, setPickupMode] = useState("asap"); // asap | later
+  const [pickupAt, setPickupAt] = useState("");
   const [website, setWebsite] = useState("");       // honeypot: real people never fill this
   const [lastOrderId, setLastOrderId] = useState(() => { try { return localStorage.getItem("last_order_id") || ""; } catch { return ""; } });
 
@@ -105,6 +107,7 @@ export default function Order() {
     && !(Number(shop?.free_delivery_over) > 0 && subtotal >= Number(shop.free_delivery_over))
     ? Number(shop?.delivery_fee) || 0 : 0;
   const total = subtotal + deliveryFee;
+  const pickupSlots = useMemo(() => buildPickupSlots(shop), [shop, cartOpen]); // refreshed every time the cart opens
   const minOrder = Number(shop?.min_order_amount) || 0;
   const hasGcash = !!shop?.gcash_number;
   const hasMaya = !!shop?.maya_number;
@@ -119,6 +122,7 @@ export default function Order() {
     if (orderType !== "dine_in" && !customer.name) return toast({ title: "Customer name required", variant: "destructive" });
     if (orderType !== "dine_in" && customer.phone.replace(/\D/g, "").length < 7) return toast({ title: "Contact number required", description: "We use it so you can track your order.", variant: "destructive" });
     if (orderType === "delivery" && !customer.address) return toast({ title: "Delivery address required", variant: "destructive" });
+    if (orderType === "takeout" && pickupMode === "later" && !pickupAt) return toast({ title: "Choose your pickup time", variant: "destructive" });
     if (payMethod !== "cash" && payRef.trim().length < 4) return toast({ title: "Enter your payment reference number", description: "Pay first, then type the reference number from your GCash/Maya receipt.", variant: "destructive" });
     if (!consent) return toast({ title: "Please agree to the Privacy Notice", variant: "destructive" });
 
@@ -143,6 +147,7 @@ export default function Order() {
         payment_reference: payMethod === "cash" ? "" : payRef.trim(),
         payment_status: "unpaid",
         privacy_consent: true,
+        pickup_time: orderType === "takeout" && pickupMode === "later" ? pickupAt : null,
         source: "online",
       });
       let order = draft;
@@ -177,6 +182,7 @@ export default function Order() {
           <div className="space-y-2 text-sm text-left mb-6">
             <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-600">Received · Preparing soon</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Estimated time</span><span className="font-600 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> 15–25 mins</span></div>
+            {placedOrder.pickup_time && <div className="flex justify-between"><span className="text-muted-foreground">Pickup time</span><span className="font-700 text-primary">{formatPickup(placedOrder.pickup_time)}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><span className="font-700 text-primary">{formatPeso(placedOrder.total)}</span></div>
           </div>
           <Link to={`/track/${placedOrder.id}`}>
@@ -320,6 +326,22 @@ export default function Order() {
                         <div><Label className="text-xs">Address</Label><Textarea value={customer.address} onChange={e => setCustomer({...customer, address: e.target.value})} className="mt-1" rows={2} /></div>
                         <div><Label className="text-xs">Notes</Label><Input value={customer.notes} onChange={e => setCustomer({...customer, notes: e.target.value})} className="mt-1" /></div>
                       </>
+                    )}
+                  </div>
+                )}
+                {orderType === "takeout" && (
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Pickup time</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <button type="button" onClick={() => setPickupMode("asap")} className={cn("py-2 rounded-lg text-xs font-600 border transition-colors", pickupMode === "asap" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40")}>As soon as possible</button>
+                      <button type="button" disabled={pickupSlots.length === 0} onClick={() => { setPickupMode("later"); if (!pickupAt) setPickupAt(pickupSlots[0] || ""); }} className={cn("py-2 rounded-lg text-xs font-600 border transition-colors disabled:opacity-40", pickupMode === "later" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40")}>Pick a time</button>
+                    </div>
+                    {pickupMode === "asap" ? (
+                      <p className="text-xs text-muted-foreground mt-2">Ready in about {shop?.estimated_time || "15–25 mins"}.</p>
+                    ) : (
+                      <select value={pickupAt} onChange={e => setPickupAt(e.target.value)} className="mt-2 w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm">
+                        {pickupSlots.map(iso => <option key={iso} value={iso}>Today, {formatPickup(iso)}</option>)}
+                      </select>
                     )}
                   </div>
                 )}

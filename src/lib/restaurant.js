@@ -115,3 +115,33 @@ export function buildCartLine(product, variant, addons = [], quantity = 1) {
     notes: "",
   };
 }
+
+// ---- Pickup time -------------------------------------------------------------
+export function formatPickup(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const t = d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
+  return sameDay ? t : `${d.toLocaleDateString("en-PH", { month: "short", day: "numeric" })} ${t}`;
+}
+
+// 15-minute pickup slots, starting 20+ min from now, until closing time (or 10 hours if no schedule)
+export function buildPickupSlots(shop) {
+  const now = new Date();
+  const start = new Date(now.getTime() + 20 * 60000);
+  start.setSeconds(0, 0);
+  start.setMinutes(Math.ceil(start.getMinutes() / 15) * 15);
+  let end = new Date(now.getTime() + 10 * 3600000);
+  if (shop?.auto_schedule && shop?.close_time) {
+    const [h, m] = String(shop.close_time).split(":").map(Number);
+    const close = new Date(now);
+    close.setHours(h || 0, m || 0, 0, 0);
+    if (close <= now) close.setDate(close.getDate() + 1); // overnight hours
+    end = close;
+  }
+  const limit = new Date(now.getTime() + 11 * 3600000);
+  if (end > limit) end = limit;
+  const slots = [];
+  for (let t = new Date(start); t <= end && slots.length < 32; t = new Date(t.getTime() + 15 * 60000)) slots.push(t.toISOString());
+  return slots;
+}

@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatPeso, ORDER_TYPES, addonsText, elapsedMinutes } from "@/lib/restaurant";
+import { formatPeso, ORDER_TYPES, addonsText, elapsedMinutes, formatPickup } from "@/lib/restaurant";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 8000;
@@ -182,6 +182,7 @@ export default function Track() {
           <div className="text-right text-xs text-muted-foreground">
             <div>{ORDER_TYPES[order.order_type]}{order.table_number ? ` · Table ${order.table_number}` : ""}</div>
             {!done && !cancelled && <div className="mt-0.5">Ordered {mins} min ago</div>}
+            {order.pickup_time && <div className="mt-1 text-sm font-700 text-primary">Pickup at {formatPickup(order.pickup_time)}</div>}
           </div>
         </div>
 
@@ -198,7 +199,7 @@ export default function Track() {
             <div className="mt-5 rounded-2xl bg-primary/10 border border-primary/30 p-4">
               <div className="font-display font-700 uppercase text-primary">{list[current].label}</div>
               <div className="text-sm text-muted-foreground mt-0.5">{list[current].hint}</div>
-              {!done && order.status !== "ready" && <div className="text-xs text-muted-foreground mt-2">Estimated time: {estimated}</div>}
+              {!done && order.status !== "ready" && <div className="text-xs text-muted-foreground mt-2">{order.pickup_time ? `Scheduled for pickup at ${formatPickup(order.pickup_time)}` : `Estimated time: ${estimated}`}</div>}
             </div>
 
             {awaitingPayment && (

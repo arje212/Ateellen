@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { downloadFullBackup, downloadOrdersCsv } from "@/lib/backup";
 import { cn } from "@/lib/utils";
+import ImageUploader from "@/components/ImageUploader";
 
 const DEFAULTS = {
   restaurant_name: "Daddy's Sizzlers", address: "", phone: "", email: "", facebook_page: "",
@@ -145,7 +146,7 @@ export default function Settings() {
             <div><Label>Maya number</Label><Input value={form.maya_number} onChange={set("maya_number")} className="mt-1" /></div>
             <div><Label>Maya account name</Label><Input value={form.maya_name} onChange={set("maya_name")} className="mt-1" /></div>
           </div>
-          <div><Label>GCash QR image link (optional)</Label><Input value={form.gcash_qr_url} onChange={set("gcash_qr_url")} placeholder="https://..." className="mt-1" /></div>
+          <div><Label>GCash QR picture (optional)</Label><div className="mt-1"><ImageUploader shape="square" folder="payment" value={form.gcash_qr_url} onChange={url => setForm(f => ({ ...f, gcash_qr_url: url }))} /></div></div>
           <p className="text-xs text-muted-foreground">Leave blank to accept cash only. A payment option appears at checkout only when its number is filled in.</p>
         </Section>
 

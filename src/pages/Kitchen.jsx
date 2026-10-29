@@ -4,7 +4,7 @@ import { ChefHat, Clock, Flame, Check, Utensils, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { playBeep } from "@/lib/sound";
-import { ORDER_TYPES, ORDER_STATUSES, elapsedMinutes, addonsText } from "@/lib/restaurant";
+import { ORDER_TYPES, ORDER_STATUSES, elapsedMinutes, addonsText, formatPickup } from "@/lib/restaurant";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = [
@@ -98,6 +98,9 @@ export default function Kitchen() {
                         <div>
                           <div className="font-display font-700 text-lg leading-none">{o.order_number}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{ORDER_TYPES[o.order_type]} {o.table_number ? `· Table ${o.table_number}` : ""}</div>
+                          {o.pickup_time && (
+                            <div className="inline-block mt-1 text-xs font-700 text-primary-foreground bg-primary rounded px-2 py-0.5">⏰ PICKUP {formatPickup(o.pickup_time)}</div>
+                          )}
                           {["gcash", "maya"].includes(o.payment_method) && o.payment_status === "unpaid" && (
                             <div className="text-[11px] font-700 text-amber-400 mt-1">⚠ {o.payment_method.toUpperCase()} not yet confirmed (ref {o.payment_reference || "—"})</div>
                           )}
